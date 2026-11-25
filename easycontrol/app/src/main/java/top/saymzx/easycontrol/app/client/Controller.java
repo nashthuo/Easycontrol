@@ -67,6 +67,10 @@ public class Controller {
     writeStream(ByteBuffer.wrap(new byte[]{4}));
   }
 
+  public void sendRotate() {
+    writeStream(ByteBuffer.wrap(new byte[]{6}));
+  }
+
   public void sendPowerEvent() {
     writeStream(ByteBuffer.wrap(new byte[]{5}));
   }

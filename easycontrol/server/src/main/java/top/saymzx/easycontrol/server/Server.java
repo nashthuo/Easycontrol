@@ -30,6 +30,7 @@ import top.saymzx.easycontrol.server.entity.Device;
 import top.saymzx.easycontrol.server.entity.Options;
 import top.saymzx.easycontrol.server.helper.AudioEncode;
 import top.saymzx.easycontrol.server.helper.Controller;
+import top.saymzx.easycontrol.server.helper.Rotation;
 import top.saymzx.easycontrol.server.helper.VideoEncode;
 import top.saymzx.easycontrol.server.wrappers.ClipboardManager;
 import top.saymzx.easycontrol.server.wrappers.DisplayManager;
@@ -129,6 +130,7 @@ public final class Server {
 
     // Restore display power before waiting on any codec or input worker.
     displayPower.restore();
+    Rotation.restore();
 
     boolean allStopped = true;
     for (Thread worker : workers) {

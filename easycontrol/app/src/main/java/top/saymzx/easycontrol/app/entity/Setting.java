@@ -96,6 +96,25 @@ public final class Setting {
     editor.apply();
   }
 
+  // Floating window box per tablet orientation: {x, y, width, height} of the video area, or null.
+  public int[] getWindowBox(boolean landscape) {
+    String value = sharedPreferences.getString(landscape ? "windowBoxLand" : "windowBoxPort", "");
+    String[] parts = value.split(",");
+    if (parts.length != 4) return null;
+    try {
+      int[] box = new int[4];
+      for (int i = 0; i < 4; i++) box[i] = Integer.parseInt(parts[i]);
+      return box[2] > 0 && box[3] > 0 ? box : null;
+    } catch (NumberFormatException ignored) {
+      return null;
+    }
+  }
+
+  public void setWindowBox(boolean landscape, int x, int y, int width, int height) {
+    editor.putString(landscape ? "windowBoxLand" : "windowBoxPort", x + "," + y + "," + width + "," + height);
+    editor.apply();
+  }
+
   public Setting(SharedPreferences sharedPreferences) {
     this.sharedPreferences = sharedPreferences;
     this.editor = sharedPreferences.edit();
