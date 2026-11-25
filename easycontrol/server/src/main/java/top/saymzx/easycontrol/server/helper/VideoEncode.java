@@ -132,21 +132,54 @@ public final class VideoEncode {
       try {
         ByteBuffer output = encedec.getOutputBuffer(outIndex);
         if (output == null || bufferInfo.size == 0) continue;
-        if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+        // Some encoders (Qualcomm OMX with prepend-sps-pps) put SPS + PPS + IDR in ONE buffer,
+        // emit no separate config buffer, and send the next IDR many seconds later.
+        // Decide by the NAL units in the buffer, not by its flags alone.
+        int slice = firstSliceOffset(output);
+        if (slice < 0) {
           if (!hasFormatConfig) {
             config = ByteBuffer.allocate(output.remaining());
             config.put(output.duplicate()).flip();
           }
-        } else if (config != null && (bufferInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0) {
-          writeVideo(config);
-          writeVideo(output);
-          return;
+        } else if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0 || isIdrSlice(output, slice)) {
+          if (config == null && slice > 0) {
+            ByteBuffer inline = output.duplicate();
+            inline.limit(inline.position() + slice);
+            config = ByteBuffer.allocate(slice);
+            config.put(inline).flip();
+          }
+          if (config != null) {
+            writeVideo(config);
+            writeVideo(output);
+            return;
+          }
         }
       } finally {
         encedec.releaseOutputBuffer(outIndex, false);
       }
     }
     throw new IOException(ServerText.get("invalid_video_output"));
+  }
+
+  // Returns the offset of the first slice NAL unit (types 1-5) from the buffer position,
+  // including a 4-byte start code, or -1 when the buffer holds only parameter sets.
+  private static int firstSliceOffset(ByteBuffer data) {
+    int base = data.position();
+    int end = data.limit();
+    for (int i = base; i + 3 < end; i++) {
+      if (data.get(i) == 0 && data.get(i + 1) == 0 && data.get(i + 2) == 1) {
+        int type = data.get(i + 3) & 0x1f;
+        if (type >= 1 && type <= 5) return (i > base && data.get(i - 1) == 0 ? i - 1 : i) - base;
+        i += 2;
+      }
+    }
+    return -1;
+  }
+
+  private static boolean isIdrSlice(ByteBuffer data, int slice) {
+    int i = data.position() + slice;
+    while (i < data.limit() && data.get(i) == 0) i++;
+    return i + 1 < data.limit() && (data.get(i + 1) & 0x1f) == 5;
   }
 
   public static void encodeOut() throws InterruptedIOException, ErrnoException {

@@ -29,3 +29,4 @@
 - A decoder error after video starts now reconnects instead of ending the session.
 - Decoder input buffer sized for large key frames.
 - Known behaviour: after a Power or Wake press, "turn off phone screen" stays paused for the rest of that session.
+- Startup sends the first frame when SPS, PPS and the IDR arrive in one buffer (Qualcomm OMX); the loop reads the NAL types, not only the flags.
