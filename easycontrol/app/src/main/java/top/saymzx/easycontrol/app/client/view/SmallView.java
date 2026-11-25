@@ -39,11 +39,11 @@ public class SmallView {
   private final ModuleSmallViewBinding smallView = ModuleSmallViewBinding.inflate(AppData.main.getLayoutInflater());
   private final int videoMarginX = AppData.publicTools.dp2px(10f);
   private final int videoMarginY = AppData.publicTools.dp2px(20f);
-  private final int minButton = AppData.publicTools.dp2px(24f);
-  private final int maxButton = AppData.publicTools.dp2px(40f);
+  // Dock buttons: 48 dp touch targets with a 4 dp dead zone between them (Nash 2026-11-25).
+  private final int buttonSize = AppData.publicTools.dp2px(48f);
+  private final int buttonGap = AppData.publicTools.dp2px(4f);
   private final int dockPadding = AppData.publicTools.dp2px(4f);
   private final int screenGap = AppData.publicTools.dp2px(8f);
-  private int buttonSize = AppData.publicTools.dp2px(36f);
 
   private final WindowManager.LayoutParams smallViewParams =
     new WindowManager.LayoutParams(
@@ -229,7 +229,7 @@ public class SmallView {
 
   private Pair<Integer, Integer> availableBox() {
     Rect area = usableArea();
-    int dock = maxButton + dockPadding;
+    int dock = dockThickness();
     int width = area.width() - videoMarginX - screenGap - (landscape ? dock : 0);
     int height = area.height() - videoMarginY - screenGap - (landscape ? 0 : dock);
     int min = AppData.publicTools.dp2px(150f);
@@ -256,19 +256,17 @@ public class SmallView {
     sizeDock(landscape ? lp.height + videoMarginY : lp.width + videoMarginX);
   }
 
-  // Fit the dock buttons along the video side, between 24 dp and 40 dp each.
+  // Fixed-size dock buttons with a gap along the dock axis. The dock may be longer than the video.
   private void sizeDock(int length) {
-    int count = 0;
-    for (int i = 0; i < smallView.dock.getChildCount(); i++)
-      if (smallView.dock.getChildAt(i).getVisibility() != View.GONE) count++;
-    if (count == 0) count = 1;
-    buttonSize = Math.max(minButton, Math.min(maxButton, (length - dockPadding) / count));
-    int padding = buttonSize * 2 / 9;
+    int padding = (buttonSize - AppData.publicTools.dp2px(24f)) / 2;
     for (int i = 0; i < smallView.dock.getChildCount(); i++) {
       View child = smallView.dock.getChildAt(i);
-      ViewGroup.LayoutParams lp = child.getLayoutParams();
+      LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) child.getLayoutParams();
       lp.width = buttonSize;
       lp.height = buttonSize;
+      int half = buttonGap / 2;
+      if (landscape) lp.setMargins(0, half, 0, half);
+      else lp.setMargins(half, 0, half, 0);
       child.setLayoutParams(lp);
       child.setPadding(padding, padding, padding, padding);
     }
@@ -283,7 +281,7 @@ public class SmallView {
     int count = 0;
     for (int i = 0; i < smallView.dock.getChildCount(); i++)
       if (smallView.dock.getChildAt(i).getVisibility() != View.GONE) count++;
-    int dockLength = count * buttonSize + dockPadding;
+    int dockLength = count * (buttonSize + buttonGap) + dockPadding;
     int videoWidth = lp.width + videoMarginX;
     int videoHeight = lp.height + videoMarginY;
     if (landscape) return new Pair<>(videoWidth + dockThickness(), Math.max(videoHeight, dockLength));
