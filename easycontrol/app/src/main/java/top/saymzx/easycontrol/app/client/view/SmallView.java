@@ -207,10 +207,18 @@ public class SmallView {
 
   // The screen area free of the status bar and the navigation bar.
   private Rect usableArea() {
-    Rect area = new Rect();
-    AppData.main.getWindow().getDecorView().getWindowVisibleDisplayFrame(area);
-    Pair<Integer, Integer> screen = AppData.publicTools.getScreenSize();
-    if (area.width() <= 0 || area.height() <= 0) area.set(0, 0, screen.first, screen.second);
+    // Read the display, not an activity window: the main activity may be stopped and hold an old frame.
+    android.view.Display display = AppData.main.getWindowManager().getDefaultDisplay();
+    android.util.DisplayMetrics real = new android.util.DisplayMetrics();
+    android.util.DisplayMetrics app = new android.util.DisplayMetrics();
+    display.getRealMetrics(real);
+    display.getMetrics(app);
+    Rect area = new Rect(0, 0, real.widthPixels, real.heightPixels);
+    // The navigation bar takes the difference between the real and the app size.
+    if (app.widthPixels < real.widthPixels) area.right = app.widthPixels;
+    if (app.heightPixels < real.heightPixels) area.bottom = app.heightPixels;
+    int id = AppData.main.getResources().getIdentifier("status_bar_height", "dimen", "android");
+    if (id > 0) area.top = AppData.main.getResources().getDimensionPixelSize(id);
     return area;
   }
 
