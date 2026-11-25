@@ -76,7 +76,9 @@ final class LanScanner {
   }
 
   private static String probeHost(Network network, byte[] target) {
-    try (Socket socket = network.getSocketFactory().createSocket()) {
+    // Use normal routing, not a socket bound to the Wi-Fi network: a VPN such as Tailscale
+    // can block bound sockets, while the system still routes the LAN subnet over Wi-Fi.
+    try (Socket socket = new Socket()) {
       InetAddress host = InetAddress.getByAddress(target);
       socket.connect(new InetSocketAddress(host, ADB_PORT), CONNECT_TIMEOUT_MS);
       return host.getHostAddress() + ":" + ADB_PORT;
