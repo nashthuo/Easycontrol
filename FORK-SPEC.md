@@ -84,12 +84,31 @@ A free, always-English, more reliable build of Easycontrol V1.0.11, for one use:
    The app tries the first address, then the second.
    - Accept: with the first address wrong, the link opens on the second.
 
+## Wave 1 — results on the Lenovo Tab M10 + Redmi Note 8 (2026-11-25, build 881ce10)
+
+| Check | Result |
+|---|---|
+| All UI text English (`tools/check-no-cjk.py`) | PASS |
+| First connect shows "Tap Allow on the phone to approve this tablet" | PASS |
+| First frame | PASS, under 2 s (after the Qualcomm SPS+PPS+IDR fix) |
+| Close always visible; Close leaves 0 server processes; phone screen ON | PASS |
+| Key buttons (Home, Back, Recents, Volume, Power, Wake) | PASS (Home moved the phone from Deezer to the MIUI launcher) |
+| Auto-open the default device on app start | PASS |
+| Auto-reconnect (tablet Wi-Fi off 20 s) | PASS ("Reconnecting…", then a live frame) |
+| Tailscale fallback (dead first address) | PASS, link in about 6 s; phone adb peer = tablet Tailscale IP |
+| 20 open/close cycles | PASS 20/20, 0 leftover processes, screen ON each time |
+| Kill path (force-stop the app mid-session) | PASS, server ends within 2 s, screen ON |
+
+Known bug (moves to Wave 2): a long-press on the device row sometimes opens the menu AND starts a mirror
+behind it. Fix: in `DeviceListAdapter`, ignore the click that follows a handled long-press.
+
 ## Wave 2 — tasks (spec detail added when Wave 1 lands)
 
 ADB reuse (one adb link kept for a reconnect) · Tasker broadcast commands (open, close, key, by an
 explicit intent with a permission) · remember window size and position per orientation · clipboard sync
 with an on/off switch · send a file to the phone Download folder · decoder auto-pick for lowest lag ·
-single-app mirroring · resolution on connect, restored after · LAN scan for wireless adb devices.
+single-app mirroring · resolution on connect, restored after · LAN scan for wireless adb devices ·
+fix the long-press stray mirror (above).
 
 ## Operating rule
 
