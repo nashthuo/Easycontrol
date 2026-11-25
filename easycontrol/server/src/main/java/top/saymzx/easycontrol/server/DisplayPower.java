@@ -23,7 +23,7 @@ public final class DisplayPower {
   void startGuard() {
     try {
       // app_process inherits the class path for the same server jar.
-      guard = new ProcessBuilder("app_process", "/", DisplayPower.class.getName()).start();
+      guard = new ProcessBuilder("app_process", "/", "--nice-name=ec_display_guard", DisplayPower.class.getName()).start();
       commands = guard.getOutputStream();
       if (guard.getInputStream().read() != READY) {
         throw new IOException(ServerText.get("display_guard_failed"));

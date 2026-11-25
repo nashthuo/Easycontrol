@@ -20,3 +20,12 @@
 - Added Volume up, Volume down, Power, and Wake to the mirror controls. Added a persistent Close and showed controls for three seconds after opening.
 - Kept the mirror window visible during retry, with a tap to cancel. Used delays of 2, 4, 8, 16, then 30 seconds for up to ten minutes.
 - Saved an optional fallback address per device with a version 1 to version 2 database migration. Tried the primary address before the fallback on initial connection and retry.
+
+## Review fixes (Claude, 2026-11-25)
+- CI: call sdkmanager by full path; build the server and the app in two Gradle runs.
+- Display guard runs as `ec_display_guard`, so the stock app's `grep easycontrol | kill` cannot stop it; a hung guard is destroyed before restore.
+- adb stream open waits 10 s (was 1 s), for Wi-Fi power save and Tailscale relays.
+- versionCode adds the CI run number, so each build pushes a fresh server jar to the phone.
+- A decoder error after video starts now reconnects instead of ending the session.
+- Decoder input buffer sized for large key frames.
+- Known behaviour: after a Power or Wake press, "turn off phone screen" stays paused for the rest of that session.

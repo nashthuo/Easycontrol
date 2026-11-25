@@ -23,12 +23,13 @@ jobs:
       - name: Check English source and resources
         run: python tools/check-no-cjk.py
       - name: Install Android SDK 33
-        run: sdkmanager 'platforms;android-33' 'build-tools;30.0.3' 'build-tools;33.0.2'
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-33' 'build-tools;30.0.3' 'build-tools;33.0.2'
       - name: Build server and APK
         working-directory: easycontrol
         run: |
           chmod +x gradlew
-          ./gradlew :server:copyRelease :app:assembleRelease
+          ./gradlew :server:copyRelease
+          ./gradlew :app:assembleRelease
       - name: Sign and verify release APK
         shell: bash
         env:
