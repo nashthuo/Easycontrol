@@ -124,6 +124,7 @@ Decided for you (Wave 2, small and reversible):
 | Check | Result |
 |---|---|
 | Docked bar: bottom in portrait, right in landscape, never hides | PASS |
+| Dock buttons 48 dp, 4 dp gaps, press highlight (Nash 2026-11-25 grill); Vol+ then Vol- adjacent taps hit the right button | PASS (build 161c5e9) |
 | Fit to screen (portrait and landscape, inside status and nav bars) | PASS (after 2 fixes) |
 | Rotate phone (user_rotation 0 -> 1 -> 0; settings restored on Close) | PASS |
 | Window memory per orientation (box restored after app restart and after tablet rotation) | PASS |
