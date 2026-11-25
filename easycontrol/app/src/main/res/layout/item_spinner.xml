@@ -13,7 +13,7 @@
         android:id="@+id/item_spinner_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="视频码率:"
+
         android:textColor="@color/onCardBackground"
         android:textSize="@dimen/middleFont"
         tools:ignore="HardcodedText" />

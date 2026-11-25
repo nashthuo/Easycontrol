@@ -1,6 +1,5 @@
 package top.saymzx.easycontrol.app.helper;
 
-import android.annotation.SuppressLint;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
@@ -12,68 +11,59 @@ import java.util.ArrayList;
 import top.saymzx.easycontrol.app.entity.Device;
 
 public class DbHelper extends SQLiteOpenHelper {
-
-  private static final String dataBaseName = "app.db";
-  private static final int version = 1;
-  private final String tableName = "DevicesDb";
+  private static final String TABLE = "DevicesDb";
+  private static final int VERSION = 2;
 
   public DbHelper(Context context) {
-    super(context, dataBaseName, null, version);
+    super(context, "app.db", null, VERSION);
   }
 
   @Override
   public void onCreate(SQLiteDatabase db) {
-    db.execSQL("CREATE TABLE " + tableName + " (\n" + "\t id integer PRIMARY KEY AUTOINCREMENT,\n" + "\t name text,\n" + "\t address text,\n"+ "\t isAudio integer,\n" + "\t maxSize integer,\n" + "\t maxFps integer,\n" + "\t maxVideoBit integer," + "\t setResolution integer" + ")");
+    db.execSQL("CREATE TABLE " + TABLE + " (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      + " name TEXT, address TEXT, isAudio INTEGER, maxSize INTEGER, maxFps INTEGER,"
+      + " maxVideoBit INTEGER, setResolution INTEGER, fallbackAddress TEXT NOT NULL DEFAULT '')");
   }
 
-  @SuppressLint("Range")
   @Override
   public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-    // 处理数据库升级逻辑
+    if (oldVersion < 2)
+      db.execSQL("ALTER TABLE " + TABLE + " ADD COLUMN fallbackAddress TEXT NOT NULL DEFAULT ''");
   }
 
-  // 读取数据库设备列表
-  @SuppressLint("Range")
   public ArrayList<Device> getAll() {
     ArrayList<Device> devices = new ArrayList<>();
-    try (Cursor cursor = getReadableDatabase().query(tableName, null, null, null, null, null, null)) {
-      if (cursor.moveToFirst())
-        do devices.add(getDeviceFormCursor(cursor)); while (cursor.moveToNext());
+    try (Cursor cursor = getReadableDatabase().query(TABLE, null, null, null, null, null, null)) {
+      while (cursor.moveToNext()) devices.add(getDeviceFromCursor(cursor));
     }
     return devices;
   }
 
-  // 查找
-  @SuppressLint("Range")
   public Device getById(int id) {
-    Device device = null;
-    try (Cursor cursor = getReadableDatabase().query(tableName, null, "id = ?", new String[]{String.valueOf(id)}, null, null, null)) {
-      if (cursor.moveToFirst()) device = getDeviceFormCursor(cursor);
+    try (Cursor cursor = getReadableDatabase().query(TABLE, null, "id = ?",
+      new String[]{String.valueOf(id)}, null, null, null)) {
+      return cursor.moveToFirst() ? getDeviceFromCursor(cursor) : null;
     }
-    return device;
   }
 
-  // 更新
   public void insert(Device device) {
-    getWritableDatabase().insert(tableName, null, getValues(device));
+    getWritableDatabase().insert(TABLE, null, getValues(device));
   }
 
-  // 更新
   public void update(Device device) {
-    getWritableDatabase().update(tableName, getValues(device), "id=?", new String[]{String.valueOf(device.id)});
+    getWritableDatabase().update(TABLE, getValues(device), "id = ?", new String[]{String.valueOf(device.id)});
   }
 
-  // 删除
   public void delete(Device device) {
-    getWritableDatabase().delete(tableName, "id=?", new String[]{String.valueOf(device.id)});
+    getWritableDatabase().delete(TABLE, "id = ?", new String[]{String.valueOf(device.id)});
   }
 
   private ContentValues getValues(Device device) {
     ContentValues values = new ContentValues();
-    values.put("id", device.id);
     values.put("name", device.name);
     values.put("isAudio", device.isAudio);
     values.put("address", device.address);
+    values.put("fallbackAddress", device.fallbackAddress);
     values.put("maxSize", device.maxSize);
     values.put("maxFps", device.maxFps);
     values.put("maxVideoBit", device.maxVideoBit);
@@ -81,16 +71,17 @@ public class DbHelper extends SQLiteOpenHelper {
     return values;
   }
 
-  @SuppressLint("Range")
-  private Device getDeviceFormCursor(Cursor cursor) {
+  private Device getDeviceFromCursor(Cursor cursor) {
+    String address = cursor.getString(cursor.getColumnIndexOrThrow("address"));
     return new Device(
-      cursor.getInt(cursor.getColumnIndex("id")),
-      cursor.getString(cursor.getColumnIndex("name")),
-      cursor.getString(cursor.getColumnIndex("address")),
-      cursor.getInt(cursor.getColumnIndex("isAudio")) == 1,
-      cursor.getInt(cursor.getColumnIndex("maxSize")),
-      cursor.getInt(cursor.getColumnIndex("maxFps")),
-      cursor.getInt(cursor.getColumnIndex("maxVideoBit")),
-      cursor.getInt(cursor.getColumnIndex("setResolution")) == 1);
+      cursor.getInt(cursor.getColumnIndexOrThrow("id")),
+      cursor.getString(cursor.getColumnIndexOrThrow("name")),
+      address == null ? "" : address,
+      cursor.getString(cursor.getColumnIndexOrThrow("fallbackAddress")),
+      cursor.getInt(cursor.getColumnIndexOrThrow("isAudio")) == 1,
+      cursor.getInt(cursor.getColumnIndexOrThrow("maxSize")),
+      cursor.getInt(cursor.getColumnIndexOrThrow("maxFps")),
+      cursor.getInt(cursor.getColumnIndexOrThrow("maxVideoBit")),
+      cursor.getInt(cursor.getColumnIndexOrThrow("setResolution")) == 1);
   }
 }

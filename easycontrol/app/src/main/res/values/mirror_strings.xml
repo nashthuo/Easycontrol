@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="mirror_close">Close</string>
+  <string name="mirror_controls">Mirror controls</string>
+  <string name="mirror_minimize">Minimize</string>
+  <string name="mirror_fullscreen">Full screen</string>
+  <string name="mirror_windowed">Floating window</string>
+  <string name="mirror_restore_window">Restore mirror window</string>
+  <string name="mirror_volume_up">Volume up</string>
+  <string name="mirror_volume_down">Volume down</string>
+  <string name="mirror_power">Power</string>
+  <string name="mirror_wake">Wake</string>
+  <string name="mirror_display">Toggle phone display</string>
+  <string name="mirror_recent_apps">Recent apps</string>
+  <string name="mirror_home">Home</string>
+  <string name="mirror_back">Back</string>
+  <string name="mirror_hide_navigation">Show or hide navigation</string>
+  <string name="mirror_reconnecting">Reconnecting…</string>
+  <string name="mirror_reconnect_action">Reconnecting. Tap to cancel.</string>
+  <string name="mirror_cancel_reconnect">Tap to cancel</string>
+</resources>

@@ -20,7 +20,10 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 -keep public class top.saymzx.easycontrol.server.Server {
-    main(java.lang.String[]);
+    public static void main(java.lang.String[]);
+}
+-keep public class top.saymzx.easycontrol.server.DisplayPower {
+    public static void main(java.lang.String[]);
 }
 -keep class android.content.IOnPrimaryClipChangedListener{*;}
 -keep class android.view.IRotationWatcher{*;}

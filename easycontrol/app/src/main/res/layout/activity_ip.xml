@@ -41,7 +41,7 @@
         android:layout_marginStart="20dp"
         android:layout_marginTop="20dp"
         android:layout_marginBottom="10dp"
-        android:text="本机地址"
+        android:text="@string/set_other_ip"
         android:textColor="@color/onBackground"
         android:textSize="@dimen/largeFont" />
 
@@ -60,7 +60,7 @@
           android:layout_width="match_parent"
           android:layout_height="wrap_content"
           android:layout_marginBottom="8dp"
-          android:text="IPv4: (点击复制)"
+          android:text="@string/ip_ipv4"
           android:textColor="@color/onCardBackground"
           android:textSize="@dimen/largeFont" />
 
@@ -76,7 +76,7 @@
           android:layout_height="wrap_content"
           android:layout_marginTop="12dp"
           android:layout_marginBottom="8dp"
-          android:text="IPv6: (点击复制)"
+          android:text="@string/ip_ipv6"
           android:textColor="@color/onCardBackground"
           android:textSize="@dimen/largeFont" />
 

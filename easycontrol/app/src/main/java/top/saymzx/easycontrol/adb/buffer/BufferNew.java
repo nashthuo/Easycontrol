@@ -1,53 +1,50 @@
 package top.saymzx.easycontrol.adb.buffer;
 
+import java.io.EOFException;
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.ArrayDeque;
 
 public class BufferNew {
-  final LinkedBlockingDeque<ByteBuffer> dataQueue = new LinkedBlockingDeque<>();
+  private static final int MAX_BUFFER_BYTES = 32 * 1024 * 1024;
+  private final ArrayDeque<ByteBuffer> dataQueue = new ArrayDeque<>();
+  private int size;
+  private boolean closed;
 
-  public void write(ByteBuffer data) {
-    dataQueue.offerLast(data);
+  public synchronized void write(ByteBuffer data) throws IOException {
+    if (closed || !data.hasRemaining()) return;
+    if (data.remaining() > MAX_BUFFER_BYTES - size) throw new IOException("ADB stream buffer is full");
+    size += data.remaining();
+    dataQueue.addLast(data);
+    notifyAll();
   }
 
-  public ByteBuffer read(int size) throws InterruptedException {
-    ByteBuffer data = ByteBuffer.allocate(size);
-    int readBytes = 0;
-    synchronized (this) {
-      while (readBytes < size) {
-        ByteBuffer tmpData = dataQueue.takeFirst();
-        int needReadSize = size - readBytes;
-        if (tmpData.remaining() > needReadSize) {
-          readBytes += needReadSize;
-          int oldLimit = tmpData.limit();
-          tmpData.limit(tmpData.position() + needReadSize);
-          data.put(tmpData);
-          tmpData.limit(oldLimit);
-          dataQueue.offerFirst(tmpData);
-        } else {
-          readBytes += tmpData.remaining();
-          data.put(tmpData);
-        }
+  public synchronized ByteBuffer read(int length) throws InterruptedException, EOFException {
+    while (size < length && !closed) wait();
+    if (size < length) throw new EOFException("ADB stream closed");
+    ByteBuffer result = ByteBuffer.allocate(length);
+    while (result.hasRemaining()) {
+      ByteBuffer data = dataQueue.getFirst();
+      if (data.remaining() <= result.remaining()) {
+        result.put(dataQueue.removeFirst());
+      } else {
+        int oldLimit = data.limit();
+        data.limit(data.position() + result.remaining());
+        result.put(data);
+        data.limit(oldLimit);
       }
     }
-    data.flip();
-    return data;
+    size -= length;
+    result.flip();
+    return result;
   }
 
-  // 队列为空时返回null
-  public ByteBuffer readNext() {
-    return dataQueue.pollFirst();
-  }
-
-  public boolean isEmpty() {
-    return dataQueue.isEmpty();
-  }
-
-  // 此操作速度较慢，慎用
-  public int getSize() {
-    int size = 0;
-    for (ByteBuffer byteBuffer : dataQueue) size += byteBuffer.remaining();
+  public synchronized int getSize() {
     return size;
   }
 
+  public synchronized void close() {
+    closed = true;
+    notifyAll();
+  }
 }

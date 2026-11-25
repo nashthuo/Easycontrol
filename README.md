@@ -1,3 +1,10 @@
+## Easycontrol EN fork
+
+Easycontrol EN mirrors and controls Android phones from an Android tablet over ADB. The fork uses
+English on every system locale and installs alongside the original app under a separate app ID.
+It is based on [Easycontrol V1.0.11 by mingzhixian](https://github.com/mingzhixian/Easycontrol)
+and keeps its GPL-3.0 license.
+
 # 易控(Easycontrol)
 
 ## 简介

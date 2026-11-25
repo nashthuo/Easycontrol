@@ -1,6 +1,5 @@
 package top.saymzx.easycontrol.app;
 
-import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipDescription;
 import android.content.Context;
@@ -19,7 +18,7 @@ import top.saymzx.easycontrol.app.databinding.ActivityIpBinding;
 import top.saymzx.easycontrol.app.databinding.ItemTextBinding;
 import top.saymzx.easycontrol.app.entity.AppData;
 
-public class IpActivity extends Activity {
+public class IpActivity extends EnglishActivity {
   private ActivityIpBinding ipActivity;
 
   @Override
@@ -27,34 +26,30 @@ public class IpActivity extends Activity {
     super.onCreate(savedInstanceState);
     ipActivity = ActivityIpBinding.inflate(this.getLayoutInflater());
     setContentView(ipActivity.getRoot());
-    // 设置状态栏导航栏颜色沉浸
     AppData.publicTools.setStatusAndNavBar(this);
     setButtonListener();
-    // 绘制UI
     drawUi();
   }
 
   private void drawUi() {
-    // 添加IP
     Pair<ArrayList<String>, ArrayList<String>> listPair = getIp();
     Context context = this;
     for (String i : listPair.first) {
       ItemTextBinding text = AppData.publicTools.createTextCard(context, i, () -> {
         AppData.clipBoard.setPrimaryClip(ClipData.newPlainText(ClipDescription.MIMETYPE_TEXT_PLAIN, i));
-        Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show();
+        Toast.makeText(context, R.string.toast_copy, Toast.LENGTH_SHORT).show();
       });
       ipActivity.ipv4.addView(text.getRoot());
     }
     for (String i : listPair.second) {
       ItemTextBinding text = AppData.publicTools.createTextCard(context, i, () -> {
         AppData.clipBoard.setPrimaryClip(ClipData.newPlainText(ClipDescription.MIMETYPE_TEXT_PLAIN, i));
-        Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show();
+        Toast.makeText(context, R.string.toast_copy, Toast.LENGTH_SHORT).show();
       });
       ipActivity.ipv6.addView(text.getRoot());
     }
   }
 
-  // 获取IP地址
   private Pair<ArrayList<String>, ArrayList<String>> getIp() {
     ArrayList<String> ipv4Addresses = new ArrayList<>();
     ArrayList<String> ipv6Addresses = new ArrayList<>();
@@ -78,7 +73,6 @@ public class IpActivity extends Activity {
     return new Pair<>(ipv4Addresses, ipv6Addresses);
   }
 
-  // 设置返回按钮监听
   private void setButtonListener() {
     ipActivity.backButton.setOnClickListener(v -> finish());
   }

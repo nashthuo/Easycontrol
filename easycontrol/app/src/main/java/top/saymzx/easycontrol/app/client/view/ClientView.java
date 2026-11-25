@@ -1,33 +1,34 @@
 package top.saymzx.easycontrol.app.client.view;
 
-import android.animation.Animator;
 import android.annotation.SuppressLint;
 import android.graphics.SurfaceTexture;
 import android.util.Pair;
 import android.view.MotionEvent;
-import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewPropertyAnimator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
-import java.io.IOException;
-
+import top.saymzx.easycontrol.app.R;
 import top.saymzx.easycontrol.app.client.Client;
+import top.saymzx.easycontrol.app.client.Controller;
 import top.saymzx.easycontrol.app.entity.AppData;
 
 public class ClientView implements TextureView.SurfaceTextureListener {
-  private final Client client;
-  public final TextureView textureView = new TextureView(AppData.main);
-  private SurfaceTexture surfaceTexture;
+  static final long INITIAL_CONTROLS_DURATION_MS = 3000;
 
-  // UI模式，0为未显示，1为全屏，2为小窗，3为mini侧边条
-  private int uiMode = 0;
+  private enum Mode { HIDDEN, FULL, SMALL, MINI, RECONNECTING }
+
+  private final Client client;
+  final TextureView textureView = new TextureView(AppData.main);
+  private SurfaceTexture surfaceTexture;
+  private boolean dismissed;
+  private Mode mode = Mode.HIDDEN;
+  private Mode previousMode = Mode.HIDDEN;
   private final SmallView smallView = new SmallView(this);
   private final MiniView miniView = new MiniView(this);
 
@@ -41,175 +42,190 @@ public class ClientView implements TextureView.SurfaceTextureListener {
   }
 
   public void changeToFull() {
+    if (dismissed || mode == Mode.FULL) return;
     if (FullActivity.isShow) {
-      Toast.makeText(AppData.main, "有设备正在全屏控制", Toast.LENGTH_SHORT).show();
-    } else {
-      client.isNormalPlay = true;
-      hide(false);
-      uiMode = 1;
-      FullActivity.show(this, client.controller, videoSize.second > videoSize.first);
+      Toast.makeText(AppData.main, R.string.toast_fullscreen_busy, Toast.LENGTH_SHORT).show();
+      if (mode == Mode.HIDDEN || mode == Mode.RECONNECTING) changeToSmall();
+      return;
     }
+    hideWindow();
+    client.isNormalPlay = true;
+    mode = Mode.FULL;
+    FullActivity.show(this, client.controller, videoSize.second > videoSize.first);
   }
 
   public void changeToSmall() {
+    if (dismissed || mode == Mode.SMALL) return;
+    hideWindow();
     client.isNormalPlay = true;
-    hide(false);
-    uiMode = 2;
+    mode = Mode.SMALL;
     smallView.show(client.controller);
   }
 
   public void changeToMini() {
+    if (dismissed || mode == Mode.MINI) return;
+    hideWindow();
     client.isNormalPlay = false;
-    hide(false);
-    uiMode = 3;
+    mode = Mode.MINI;
     miniView.show();
   }
 
+  public void showReconnecting(Runnable cancel) {
+    if (dismissed || mode == Mode.RECONNECTING) return;
+    previousMode = mode;
+    if (mode != Mode.SMALL) hideWindow();
+    mode = Mode.RECONNECTING;
+    smallView.showReconnecting(cancel);
+  }
+
+  public void restoreAfterReconnect() {
+    if (dismissed || mode != Mode.RECONNECTING) return;
+    switch (previousMode) {
+      case MINI:
+        changeToMini();
+        break;
+      case FULL:
+        changeToFull();
+        break;
+      case SMALL:
+        client.isNormalPlay = true;
+        mode = Mode.SMALL;
+        smallView.resumeMirroring(client.controller);
+        break;
+      default:
+        if (AppData.setting.getDefaultFull()) changeToFull();
+        else changeToSmall();
+    }
+    if (surfaceTexture != null) client.onSurfaceReady(surfaceTexture);
+  }
+
   public void hide(boolean isRelease) {
-    if (uiMode == 1) FullActivity.hide();
-    else if (uiMode == 2) smallView.hide();
-    else if (uiMode == 3) miniView.hide();
-    if (isRelease) {
-      if (surfaceTexture != null) surfaceTexture.release();
-      client.release();
+    if (isRelease) client.release();
+    else hideWindow();
+  }
+
+  public void dismiss() {
+    if (dismissed) return;
+    dismissed = true;
+    hideWindow();
+    if (surfaceTexture != null) {
+      surfaceTexture.release();
+      surfaceTexture = null;
     }
   }
 
-  // 旋转
-  public void changeRotation() {
-    videoSize = new Pair<>(videoSize.second, videoSize.first);
-    if (uiMode == 1) FullActivity.changeRotation();
-    else if (uiMode == 2) smallView.changeRotation();
+  private void hideWindow() {
+    Mode oldMode = mode;
+    mode = Mode.HIDDEN;
+    if (oldMode == Mode.FULL) FullActivity.hide(this);
+    else if (oldMode == Mode.SMALL || oldMode == Mode.RECONNECTING) smallView.hide();
+    else if (oldMode == Mode.MINI) miniView.hide();
   }
 
-  // 更新Surface大小
-  public void updateTextureViewSize(Pair<Integer, Integer> maxSize) {
-    // 根据原画面大小videoSize计算在maxSize空间内的最大缩放大小
-    int tmp1 = videoSize.second * maxSize.first / videoSize.first;
-    // 横向最大不会超出
-    if (maxSize.second > tmp1) surfaceSize = new Pair<>(maxSize.first, tmp1);
-      // 竖向最大不会超出
-    else
-      surfaceSize = new Pair<>(videoSize.first * maxSize.second / videoSize.second, maxSize.second);
-    // 更新大小
+  public void changeRotation() {
+    if (dismissed || videoSize == null || mode == Mode.RECONNECTING) return;
+    videoSize = new Pair<>(videoSize.second, videoSize.first);
+    if (mode == Mode.FULL) FullActivity.changeRotation(this);
+    else if (mode == Mode.SMALL) smallView.changeRotation();
+  }
+
+  void updateTextureViewSize(Pair<Integer, Integer> maxSize) {
+    double scale = Math.min((double) maxSize.first / videoSize.first,
+      (double) maxSize.second / videoSize.second);
+    surfaceSize = new Pair<>(Math.max(1, (int) (videoSize.first * scale)),
+      Math.max(1, (int) (videoSize.second * scale)));
     ViewGroup.LayoutParams layoutParams = textureView.getLayoutParams();
     layoutParams.width = surfaceSize.first;
     layoutParams.height = surfaceSize.second;
     textureView.setLayoutParams(layoutParams);
   }
 
-  // 设置视频区域触摸监听
   @SuppressLint("ClickableViewAccessibility")
   private void setTouchListener() {
-    // 视频触摸控制
-    int[] pointerList = new int[20];
+    // Android identifies pointers with IDs 0 through 31.
+    int[] startX = new int[32];
+    int[] startY = new int[32];
+    boolean[] moved = new boolean[32];
     textureView.setOnTouchListener((view, event) -> {
-      // 处理触摸事件
+      Controller controller = client.controller;
+      Pair<Integer, Integer> size = surfaceSize;
+      if (controller == null || size == null || mode == Mode.RECONNECTING) return true;
+
       int action = event.getActionMasked();
-      if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
-        int i = event.getActionIndex();
-        int x = (int) event.getX(i);
-        int y = (int) event.getY(i);
-        int p = event.getPointerId(i);
-        // 记录xy信息
-        pointerList[p] = x;
-        pointerList[10 + p] = y;
-        client.controller.sendTouchEvent(MotionEvent.ACTION_DOWN, p, (float) x / surfaceSize.first, (float) y / surfaceSize.second);
-        // 如果是小窗模式则需获取焦点，以获取剪切板同步
-        if (uiMode == 2) smallView.setViewFocus(true);
-      } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP || action == MotionEvent.ACTION_CANCEL) {
-        int i = event.getActionIndex();
-        int x = (int) event.getX(i);
-        int y = (int) event.getY(i);
-        int p = event.getPointerId(i);
-        client.controller.sendTouchEvent(MotionEvent.ACTION_UP, p, (float) x / surfaceSize.first, (float) y / surfaceSize.second);
-      } else {
+      if (action == MotionEvent.ACTION_MOVE || action == MotionEvent.ACTION_CANCEL) {
         for (int i = 0; i < event.getPointerCount(); i++) {
-          int x = (int) event.getX(i);
-          int y = (int) event.getY(i);
-          int p = event.getPointerId(i);
-          // 适配一些机器将点击视作小范围移动(小于3的圆内不做处理)
-          if (pointerList[p] != -1) {
-            if ((pointerList[p] - x) * (pointerList[p] - x) + (pointerList[10 + p] - y) * (pointerList[10 + p] - y) < 9)
-              return true;
-            pointerList[p] = -1;
+          int id = event.getPointerId(i);
+          float x = event.getX(i);
+          float y = event.getY(i);
+          if (action == MotionEvent.ACTION_MOVE && !moved[id]) {
+            float dx = startX[id] - x;
+            float dy = startY[id] - y;
+            if (dx * dx + dy * dy < 9) continue;
+            moved[id] = true;
           }
-          client.controller.sendTouchEvent(MotionEvent.ACTION_MOVE, p, (float) x / surfaceSize.first, (float) y / surfaceSize.second);
+          controller.sendTouchEvent(action == MotionEvent.ACTION_CANCEL ? MotionEvent.ACTION_UP
+            : MotionEvent.ACTION_MOVE, id, x / size.first, y / size.second);
+        }
+      } else {
+        int i = event.getActionIndex();
+        int id = event.getPointerId(i);
+        float x = event.getX(i);
+        float y = event.getY(i);
+        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
+          startX[id] = (int) x;
+          startY[id] = (int) y;
+          moved[id] = false;
+          controller.sendTouchEvent(MotionEvent.ACTION_DOWN, id, x / size.first, y / size.second);
+          if (mode == Mode.SMALL) smallView.setViewFocus(true);
+        } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP) {
+          controller.sendTouchEvent(MotionEvent.ACTION_UP, id, x / size.first, y / size.second);
         }
       }
-      // 开始多倍发包，减少阻塞
-      client.adb.sendMoreOk(client.stream);
       return true;
     });
   }
 
-  // 更改Bar View的形态
-  public void changeBarViewAnim(View view, int translationY) {
-    boolean toShowBarView = view.getVisibility() == View.GONE;
-    // 创建平移动画
-    view.setTranslationY(toShowBarView ? translationY : 0);
-    float endY = toShowBarView ? 0 : translationY;
-    // 创建缩放动画
-    view.setScaleY(toShowBarView ? 0f : 1f);
-    float endScaleY = toShowBarView ? 1f : 0f;
-    // 创建透明度动画
-    view.setAlpha(toShowBarView ? 0f : 1f);
-    float endAlpha = toShowBarView ? 1f : 0f;
+  static void resetBar(View view, boolean visible) {
+    view.animate().cancel();
+    view.setTranslationY(0);
+    view.setScaleY(1);
+    view.setAlpha(1);
+    view.setVisibility(visible ? View.VISIBLE : View.GONE);
+  }
 
-    // 设置动画时长和插值器
-    ViewPropertyAnimator animator = view.animate()
-      .translationY(endY)
-      .scaleY(endScaleY)
-      .alpha(endAlpha)
+  static void changeBarViewAnim(View view, int translationY) {
+    boolean show = view.getVisibility() != View.VISIBLE;
+    resetBar(view, true);
+    if (show) {
+      view.setTranslationY(translationY);
+      view.setScaleY(0);
+      view.setAlpha(0);
+    }
+    view.animate()
+      .translationY(show ? 0 : translationY)
+      .scaleY(show ? 1 : 0)
+      .alpha(show ? 1 : 0)
       .setDuration(300)
-      .setInterpolator(toShowBarView ? new OvershootInterpolator() : new DecelerateInterpolator());
-
-    // 显示或隐藏
-    animator.setListener(new Animator.AnimatorListener() {
-      @Override
-      public void onAnimationStart(Animator animation) {
-        if (toShowBarView) view.setVisibility(View.VISIBLE);
-      }
-
-      @Override
-      public void onAnimationEnd(Animator animation) {
-        if (!toShowBarView) view.setVisibility(View.GONE);
-      }
-
-      @Override
-      public void onAnimationCancel(Animator animation) {
-      }
-
-      @Override
-      public void onAnimationRepeat(Animator animation) {
-      }
-    });
-
-    // 启动动画
-    animator.start();
+      .setInterpolator(show ? new OvershootInterpolator() : new DecelerateInterpolator())
+      .withEndAction(() -> view.setVisibility(show ? View.VISIBLE : View.GONE))
+      .start();
   }
 
   @Override
-  public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surfaceTexture, int i, int i1) {
-    // 初始化
-    if (this.surfaceTexture == null) {
-      this.surfaceTexture = surfaceTexture;
-      try {
-        client.videoDecode.setVideoDecodec(new Surface(this.surfaceTexture));
-      } catch (IOException e) {
-        hide(true);
-      }
-      client.startSubService();
-    } else textureView.setSurfaceTexture(this.surfaceTexture);
+  public void onSurfaceTextureAvailable(@NonNull SurfaceTexture available, int width, int height) {
+    if (dismissed) return;
+    if (surfaceTexture == null) surfaceTexture = available;
+    else if (surfaceTexture != available) textureView.setSurfaceTexture(surfaceTexture);
+    if (mode != Mode.RECONNECTING) client.onSurfaceReady(surfaceTexture);
   }
 
   @Override
-  public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surfaceTexture, int i, int i1) {
+  public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surfaceTexture, int width, int height) {
   }
 
   @Override
-  public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surfaceTexture) {
-    return false;
+  public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture destroyed) {
+    return destroyed != surfaceTexture;
   }
 
   @Override

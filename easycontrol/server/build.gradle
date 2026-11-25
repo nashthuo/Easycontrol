@@ -10,8 +10,8 @@ android {
         minSdk 23
         targetSdk 33
         applicationId 'top.saymzx.easycontrol.server'
-        versionCode 10003
-        versionName '1.0.3'
+        versionCode 10012
+        versionName '1.0.12-en'
     }
 
     buildTypes {

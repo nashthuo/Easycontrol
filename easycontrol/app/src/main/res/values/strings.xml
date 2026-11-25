@@ -1,1 +1,49 @@
-<resources></resources>
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Matching translations come from Easycontrol 10507. -->
+  <string name="app_name">Easycontrol EN</string>
+  <string name="main_device_type_link">Wired</string>
+  <string name="toast_float_per">Need floating window permission</string>
+
+  <string name="set_defaults">Default settings</string>
+  <string name="set_display">Display</string>
+  <string name="set_other">Other</string>
+  <string name="set_about">About</string>
+  <string name="set_auto_control_screen">Automatically control the phone screen</string>
+  <string name="set_clear_default">Clear default device</string>
+  <string name="set_other_reset_key">Reset ADB key (requires approval)</string>
+  <string name="set_other_ip">IP addresses</string>
+  <string name="set_about_help">User guide</string>
+  <string name="set_about_privacy">Privacy Policy</string>
+  <string name="set_about_version">Version: %1$s</string>
+  <string name="toast_default_cleared">Default device cleared</string>
+  <string name="toast_key_reset">ADB key reset</string>
+  <string name="toast_no_browser">No default browser</string>
+
+  <string name="ip_ipv4">IPv4(Touch to copy)</string>
+  <string name="ip_ipv6">IPv6(Touch to copy)</string>
+  <string name="toast_copy">Copied</string>
+
+  <string name="device_name">Name</string>
+  <string name="device_name_hint">Can NOT be empty</string>
+  <string name="device_address_with_port">Address and port</string>
+  <string name="device_address_with_port_hint">IPv4, [IPv6], or hostname with port</string>
+  <string name="device_is_audio">Audio</string>
+  <string name="device_advanced">Advanced options</string>
+  <string name="device_max_size">Resolution</string>
+  <string name="device_max_fps">FPS</string>
+  <string name="device_max_video_bit">Bitrate</string>
+  <string name="device_change_resolution_on_running">Adaptive resolution</string>
+  <string name="device_light_off_on_connect">Backlight off</string>
+  <string name="device_change_to_full_on_connect">Fullscreen mode</string>
+  <string name="device_button">Ok</string>
+  <string name="set_device_title">Details</string>
+  <string name="set_device_open">Open</string>
+  <string name="set_device_default">Set default</string>
+  <string name="set_device_button_change">Settings</string>
+  <string name="set_device_button_delete">Delete</string>
+
+  <string name="loading_text">Loading\nTap to cancel</string>
+  <string name="toast_fullscreen_back">Exit fullscreen to go back on the tablet</string>
+  <string name="toast_fullscreen_busy">A device is already open in fullscreen</string>
+</resources>

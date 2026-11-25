@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="connection_awaiting_approval">Tap Allow on the phone to approve this tablet</string>
+  <string name="connection_bad_address">Enter a valid address and port.</string>
+  <string name="connection_refused">The phone refused the ADB connection.</string>
+  <string name="connection_timeout">The ADB connection timed out.</string>
+  <string name="connection_auth_timeout">The phone did not approve this tablet within 60 seconds.</string>
+  <string name="connection_auth_failed">The phone did not authorize this tablet.</string>
+  <string name="connection_unknown_host">Could not find the phone address.</string>
+  <string name="connection_unreachable">The phone network is unreachable.</string>
+  <string name="connection_failed">Could not connect to the phone over ADB.</string>
+  <string name="connection_server_timeout">The mirror server timed out.</string>
+  <string name="connection_server_upload">Could not send the mirror server to the phone.</string>
+  <string name="connection_server_start">Could not start the mirror server on the phone.</string>
+  <string name="connection_server_data">The mirror server sent incomplete or invalid data.</string>
+  <string name="connection_lost">The mirror connection closed.</string>
+  <string name="connection_retry_expired">Could not reconnect within 10 minutes.</string>
+  <string name="connection_decoder_failed">Could not decode the phone video.</string>
+  <string name="connection_both_failed">Primary: %1$s\nFallback: %2$s</string>
+  <string name="device_fallback_address">Fallback address (optional)</string>
+  <string name="setting_auto_open_default">Auto-open default device</string>
+</resources>

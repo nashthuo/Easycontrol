@@ -83,6 +83,14 @@ public final class Setting {
     return sharedPreferences.getInt("defaultDevice", -1);
   }
 
+  public boolean getAutoOpenDefault() {
+    return sharedPreferences.getBoolean("autoOpenDefault", true);
+  }
+
+  public void setAutoOpenDefault(boolean value) {
+    sharedPreferences.edit().putBoolean("autoOpenDefault", value).apply();
+  }
+
   public void setDefaultDevice(int value) {
     editor.putInt("defaultDevice", value);
     editor.apply();

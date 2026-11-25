@@ -1,0 +1,22 @@
+# Easycontrol EN Wave 1 changes
+
+- Added a GitHub Actions build, CJK gate, APK signing and verification, artifact upload, and tag release.
+- Set the application ID to `io.github.nashthuo.easycontrol` and the label to Easycontrol EN. Set both build versions to `10012` / `1.0.12-en`.
+- Ported matching English strings from upstream [10507](https://github.com/mingzhixian/Easycontrol/releases/tag/10507) and translated the remaining app UI, diagnostics, and server text.
+- Kept the base Chinese strings in `values-zh`, forced English in activities and overlay inflation, and added the CJK source check.
+- Kept the upstream README credit and added a short fork section.
+- Showed phone approval instructions during ADB public-key auth and allowed 60 seconds for the reply on the same connection.
+- Added plain-English connection, authorization, and server startup errors.
+- Added a per-session display guard that restores normal power on server pipe EOF, including when the main server gets SIGKILL.
+- Ported scoped server exit and adapted the backlight restore fix from upstream [10402](https://github.com/mingzhixian/Easycontrol/commit/991295d).
+- Ported replacement of a previous session for the same saved device and the startup dimension check from upstream [10313](https://github.com/mingzhixian/Easycontrol/commit/e0b25efd945def57a0ffae2be075a8d831c06ab0).
+- Ported default AVC decoder selection for unknown decoder names from upstream [10370](https://github.com/mingzhixian/Easycontrol/commit/2bee94bfe115309bbe7c8e552ef6279988e98d61). Try another compatible AVC decoder if default setup fails.
+- Adapted the white-screen startup fix from upstream [10402](https://github.com/mingzhixian/Easycontrol/releases/tag/10402) for the fork's AVC-only stream. Send the codec setup and first sync frame explicitly, then submit packets in receive order and time out if the decoder produces no frame.
+- Ported idempotent client close, error-driven reconnect, and bounded startup waits from upstream [10502](https://github.com/mingzhixian/Easycontrol/commit/c33a27f41687aac7cb6f429f5e685335c8033aa6).
+- Made ADB stream close wake blocked readers. Bounded connection and stream-open waits, validated packet lengths, capped stream buffers, and installed the versioned server file after a successful upload.
+- Kept the server in its ADB shell until session teardown and used a separate socket per attempt.
+- Timed out optional Opus setup and kept video available if audio negotiation failed.
+- Opened the default device on app launch after overlay permission is available. Added a switch that defaults to on.
+- Added Volume up, Volume down, Power, and Wake to the mirror controls. Added a persistent Close and showed controls for three seconds after opening.
+- Kept the mirror window visible during retry, with a tap to cancel. Used delays of 2, 4, 8, 16, then 30 seconds for up to ten minutes.
+- Saved an optional fallback address per device with a version 1 to version 2 database migration. Tried the primary address before the fallback on initial connection and retry.

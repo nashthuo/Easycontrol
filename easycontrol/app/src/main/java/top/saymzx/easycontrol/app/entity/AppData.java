@@ -17,25 +17,19 @@ public class AppData {
   @SuppressLint("StaticFieldLeak")
   public static Activity main;
 
-  // 公共工具库
   public static PublicTools publicTools = new PublicTools();
 
-  // 数据库工具
   public static DbHelper dbHelper;
 
-  // 密钥文件
   public static AdbKeyPair keyPair;
 
-  // 剪切板
   public static ClipboardManager clipBoard;
 
   // USB
   public static UsbManager usbManager;
 
-  // 设置值
   public static Setting setting;
 
-  // 当前版本号
   public static String serverName = "easycontrol_server_" + BuildConfig.VERSION_CODE + ".jar";
 
   public static void init(Activity m) {
@@ -44,7 +38,6 @@ public class AppData {
     clipBoard = (ClipboardManager) main.getSystemService(Context.CLIPBOARD_SERVICE);
     usbManager = (UsbManager) main.getSystemService(Context.USB_SERVICE);
     setting = new Setting(main.getSharedPreferences("setting", Context.MODE_PRIVATE));
-    // 读取密钥文件
     try {
       File privateKey = new File(main.getApplicationContext().getFilesDir(), "private.key");
       File publicKey = new File(main.getApplicationContext().getFilesDir(), "public.key");

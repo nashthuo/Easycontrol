@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="wrap_content"
+  android:layout_height="wrap_content"
+  android:orientation="horizontal">
+
+  <ImageButton
+    android:id="@+id/button_volume_up"
+    style="@style/MirrorKeyButton"
+    android:contentDescription="@string/mirror_volume_up"
+    android:src="@drawable/volume_up" />
+
+  <ImageButton
+    android:id="@+id/button_volume_down"
+    style="@style/MirrorKeyButton"
+    android:contentDescription="@string/mirror_volume_down"
+    android:src="@drawable/volume_down" />
+
+  <ImageButton
+    android:id="@+id/button_power"
+    style="@style/MirrorKeyButton"
+    android:contentDescription="@string/mirror_power"
+    android:src="@drawable/key_power" />
+
+  <ImageButton
+    android:id="@+id/button_wake"
+    style="@style/MirrorKeyButton"
+    android:contentDescription="@string/mirror_wake"
+    android:src="@drawable/wake" />
+</LinearLayout>

@@ -1,120 +1,93 @@
 package top.saymzx.easycontrol.adb;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.BlockingQueue;
 
 import top.saymzx.easycontrol.adb.buffer.BufferNew;
 
-public class AdbStream {
+public class AdbStream implements AutoCloseable {
   private final BlockingQueue<byte[]> sendQueue;
-  final int localId;
-  // -2为连接错误，-1为已关闭，0为连接中，大于0为已连接
-  int remoteId = 0;
-
-  private final boolean isNeedSource;
+  private final int localId;
+  private final int maxPayload;
+  private final boolean receiveData;
   private final BufferNew source = new BufferNew();
-  private final boolean canMultipleSend;
   private final BufferNew sink = new BufferNew();
-  private boolean canWrite = false;
+  private int remoteId;
+  private boolean canWrite;
+  private boolean closed;
 
-  public AdbStream(BlockingQueue<byte[]> sendQueue, int localId, boolean isNeedSource, boolean canMultipleSend) {
+  AdbStream(BlockingQueue<byte[]> sendQueue, int localId, int maxPayload, boolean receiveData) {
     this.sendQueue = sendQueue;
     this.localId = localId;
-    this.isNeedSource = isNeedSource;
-    this.canMultipleSend = canMultipleSend;
+    this.maxPayload = maxPayload;
+    this.receiveData = receiveData;
   }
 
-  public void pushSource(byte[] bytes) {
-    if (isNeedSource) source.write(ByteBuffer.wrap(bytes));
+  synchronized void awaitOpen() throws IOException, InterruptedException {
+    long deadline = System.nanoTime() + 1_000_000_000L;
+    while (remoteId == 0 && !closed) {
+      long remainingMs = (deadline - System.nanoTime()) / 1_000_000L;
+      if (remainingMs <= 0) throw new SocketTimeoutException("ADB did not open the stream");
+      wait(remainingMs);
+    }
+    if (remoteId == 0) throw new IOException("ADB could not open the stream");
   }
 
-  private ByteBuffer pollSink() throws InterruptedException {
-    if (sink.isEmpty()) return null;
-    // 此处打包发送，以减少ADB同步阻塞带来的延迟
-    if (canMultipleSend) return sink.read(sink.getSize());
-    else return sink.readNext();
+  synchronized void awaitClose() throws InterruptedException {
+    while (!closed) wait();
+  }
+
+  void receive(byte[] bytes) throws IOException {
+    if (receiveData) source.write(ByteBuffer.wrap(bytes));
   }
 
   public int readInt() throws InterruptedException, IOException {
     return readByteArray(4).getInt();
   }
 
-  public long readLong() throws InterruptedException, IOException {
-    return readByteArray(8).getLong();
-  }
-
   public byte readByte() throws InterruptedException, IOException {
     return readByteArray(1).get();
   }
 
-  public ByteBuffer readAllBytes() throws InterruptedException, IOException {
-    return readByteArray(source.getSize());
-  }
-
-  public String readString() throws InterruptedException, IOException {
-    return new String(readAllBytes().array(), StandardCharsets.UTF_8);
+  String readString() throws InterruptedException, IOException {
+    return new String(readByteArray(source.getSize()).array(), StandardCharsets.UTF_8);
   }
 
   public ByteBuffer readByteArray(int size) throws InterruptedException, IOException {
-    if (remoteId <= 0 && size > getSize()) throw new IOException("未连接");
     return source.read(size);
   }
 
-  public void write(ByteBuffer byteBuffer) throws IOException, InterruptedException {
-    if (remoteId <= 0) throw new IOException("未连接");
-    sink.write(byteBuffer);
-    // 如果可以则插入发送队列
-    synchronized (this) {
-      checkSend();
+  public synchronized void write(ByteBuffer data) throws IOException, InterruptedException {
+    if (closed) throw new IOException("ADB stream closed");
+    sink.write(data);
+    sendNext();
+  }
+
+  synchronized void acknowledge(int remoteId) throws IOException, InterruptedException {
+    if (closed) return;
+    this.remoteId = remoteId;
+    canWrite = true;
+    notifyAll();
+    sendNext();
+  }
+
+  private void sendNext() throws IOException, InterruptedException {
+    int size = Math.min(sink.getSize(), maxPayload);
+    if (canWrite && size > 0) {
+      canWrite = false;
+      sendQueue.offer(AdbProtocol.generateWrite(localId, remoteId, sink.read(size).array()));
     }
   }
 
-  public void setCanWrite(int remoteId) throws InterruptedException {
-    if (this.remoteId == 0) {
-      this.remoteId = remoteId;
-      synchronized (this) {
-        notifyAll();
-      }
-    }
-    synchronized (this) {
-      canWrite = true;
-      checkSend();
-    }
-  }
-
-  private void checkSend() throws InterruptedException {
-    if (canWrite) {
-      ByteBuffer data = pollSink();
-      if (data != null) {
-        canWrite = false;
-        sendQueue.offer(AdbProtocol.generateWrite(localId, remoteId, data.array()));
-      }
-    }
-  }
-
-  public boolean isEmpty() {
-    return source.isEmpty();
-  }
-
-  public int getSize() {
-    return source.getSize();
-  }
-
-  public boolean isError() {
-    return remoteId == -2;
-  }
-
-  public void close() {
-    if (remoteId < 0) return;
-    if (remoteId == 0) remoteId = -2;
-    else {
-      sendQueue.offer(AdbProtocol.generateClose(localId, remoteId));
-      remoteId = -1;
-    }
-    synchronized (this) {
-      notifyAll();
-    }
+  @Override
+  public synchronized void close() {
+    if (closed) return;
+    closed = true;
+    if (remoteId != 0) sendQueue.offer(AdbProtocol.generateClose(localId, remoteId));
+    source.close();
+    notifyAll();
   }
 }

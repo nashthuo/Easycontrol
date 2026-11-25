@@ -20,7 +20,7 @@ public class AdbProtocol {
   public static final int CMD_WRTE = 0x45545257;
 
   public static final int CONNECT_VERSION = 0x01000000;
-  // 旧版本的adb服务端硬编码maxdata=4096，因此这里设置为4096，若你的设备较新，可将此值设置为1024*1024以提高效率
+  // This is the receive limit we advertise. The peer advertises its own write limit.
   public static final int CONNECT_MAXDATA = 1024 * 1024;
 
   public static final byte[] CONNECT_PAYLOAD = "host::\u0000".getBytes();
@@ -34,8 +34,9 @@ public class AdbProtocol {
   }
 
   public static byte[] generateOpen(int localId, String dest) {
-    ByteBuffer bbuf = ByteBuffer.allocate(dest.length() + 1);
-    bbuf.put(dest.getBytes(StandardCharsets.UTF_8));
+    byte[] destination = dest.getBytes(StandardCharsets.UTF_8);
+    ByteBuffer bbuf = ByteBuffer.allocate(destination.length + 1);
+    bbuf.put(destination);
     bbuf.put((byte) 0);
     return generateMessage(CMD_OPEN, localId, 0, bbuf.array());
   }
@@ -112,6 +113,8 @@ public class AdbProtocol {
       msg.payloadLength = buffer.getInt();
       msg.checksum = buffer.getInt();
       msg.magic = buffer.getInt();
+      if (msg.magic != ~msg.command || msg.payloadLength < 0 || msg.payloadLength > CONNECT_MAXDATA)
+        throw new IOException("Invalid ADB packet header");
       msg.payload = channel.read(msg.payloadLength);
 
       return msg;

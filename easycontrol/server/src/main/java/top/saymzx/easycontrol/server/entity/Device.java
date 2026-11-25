@@ -1,11 +1,9 @@
 /*
- * 本项目大量借鉴学习了开源投屏软件：Scrcpy，在此对该项目表示感谢
+ * This project draws on the open source scrcpy project.
  */
 package top.saymzx.easycontrol.server.entity;
 
 import android.content.IOnPrimaryClipChangedListener;
-import android.os.Build;
-import android.os.IBinder;
 import android.os.SystemClock;
 import android.util.Pair;
 import android.view.IRotationWatcher;
@@ -23,7 +21,6 @@ import top.saymzx.easycontrol.server.helper.VideoEncode;
 import top.saymzx.easycontrol.server.wrappers.ClipboardManager;
 import top.saymzx.easycontrol.server.wrappers.DisplayManager;
 import top.saymzx.easycontrol.server.wrappers.InputManager;
-import top.saymzx.easycontrol.server.wrappers.SurfaceControl;
 import top.saymzx.easycontrol.server.wrappers.WindowManager;
 
 public final class Device {
@@ -41,23 +38,26 @@ public final class Device {
     DisplayInfo displayInfo = DisplayManager.getDisplayInfo(displayId);
     deviceSize = displayInfo.size;
     deviceRotation = displayInfo.rotation;
-    // 修改分辨率
+    // Change the resolution.
     if (Options.setWidth != -1) calculateSize();
-    // 计算视频大小
+    // Compute the video size.
     computeVideoSize();
     layerStack = displayInfo.layerStack;
-    // 旋转监听
+  }
+
+  public static void startListeners() {
+    // Watch for rotation.
     setRotationListener();
-    // 剪切板监听
+    // Watch for clipboard changes.
     setClipBoardListener();
   }
 
-  // 计算最佳的分辨率大小，按照主控端长宽比例缩放
+  // Fit the resolution to the client aspect ratio.
   private static void calculateSize() throws IOException, InterruptedException {
-    // 获取未旋转的原始分辨率
+    // Use the original resolution before rotation.
     if (deviceRotation == 1 || deviceRotation == 3)
       deviceSize = new Pair<>(deviceSize.second, deviceSize.first);
-    // 保证方向一致
+    // Match the display orientation.
     if (deviceSize.first < deviceSize.second ^ Options.setWidth < Options.setHeight) {
       int tmp = Options.setWidth;
       Options.setWidth = Options.setHeight;
@@ -65,15 +65,15 @@ public final class Device {
     }
     Pair<Integer, Integer> newScreenSize;
     int tmp1 = Options.setHeight * Device.deviceSize.first / Options.setWidth;
-    // 横向最大不会超出
+    // Keep the width within the display width.
     if (Device.deviceSize.second > tmp1) newScreenSize = new Pair<>(Device.deviceSize.first, tmp1);
-      // 竖向最大不会超出
+      // Keep the height within the display height.
     else
       newScreenSize = new Pair<>(Options.setWidth * Device.deviceSize.second / Options.setHeight, Device.deviceSize.second);
-    // 修改分辨率
+    // Change the resolution.
     Process process = new ProcessBuilder().command("sh", "-c", "wm size " + newScreenSize.first + "x" + newScreenSize.second).start();
-    // 更新新的设备分辨率大小
-    process.waitFor();
+    // Read the new resolution.
+    Options.resolutionChanged = process.waitFor() == 0;
     DisplayInfo displayInfo = DisplayManager.getDisplayInfo(displayId);
     deviceSize = displayInfo.size;
     deviceRotation = displayInfo.rotation;
@@ -87,7 +87,7 @@ public final class Device {
       minor = minor * Options.maxSize / major;
       major = Options.maxSize;
     }
-    // h264只接受8的倍数，所以需要缩放至最近参数
+    // Round the H.264 dimensions to multiples of eight.
     minor = minor + 4 & ~7;
     major = major + 4 & ~7;
     videoSize = isPortrait ? new Pair<>(minor, major) : new Pair<>(major, minor);
@@ -99,7 +99,7 @@ public final class Device {
         String newClipboardText = ClipboardManager.getText();
         if (newClipboardText == null) return;
         if (!newClipboardText.equals(nowClipboardText)) {
-          // 发送报文
+          // Send the update.
           byte[] tmpTextByte = newClipboardText.getBytes(StandardCharsets.UTF_8);
           if (tmpTextByte.length > 5000) return;
           nowClipboardText = newClipboardText;
@@ -110,10 +110,8 @@ public final class Device {
           byteBuffer.flip();
           try {
             Server.write(byteBuffer);
-          } catch (Exception ignored) {
-            synchronized (Server.object) {
-              Server.object.notify();
-            }
+          } catch (Exception error) {
+            Server.requestStop(error);
           }
         }
       }
@@ -129,10 +127,8 @@ public final class Device {
           byte[] bytes = new byte[]{4};
           try {
             Server.write(ByteBuffer.wrap(bytes));
-          } catch (Exception ignored) {
-            synchronized (Server.object) {
-              Server.object.notify();
-            }
+          } catch (Exception error) {
+            Server.requestStop(error);
           }
         }
         deviceRotation = rotation;
@@ -191,18 +187,4 @@ public final class Device {
     }
   }
 
-  public static void setScreenPowerMode(int mode) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      long[] physicalDisplayIds = SurfaceControl.getPhysicalDisplayIds();
-      if (physicalDisplayIds == null) return;
-      for (long physicalDisplayId : physicalDisplayIds) {
-        IBinder token = SurfaceControl.getPhysicalDisplayToken(physicalDisplayId);
-        if (token != null) SurfaceControl.setDisplayPowerMode(token, mode);
-      }
-    } else {
-      IBinder d = SurfaceControl.getBuiltInDisplay();
-      if (d == null) return;
-      SurfaceControl.setDisplayPowerMode(d, mode);
-    }
-  }
 }

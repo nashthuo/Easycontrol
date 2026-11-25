@@ -2,7 +2,7 @@ package top.saymzx.easycontrol.adb.buffer;
 
 import java.io.IOException;
 
-//本缓冲区为环形缓冲区，请自行设置最佳大小，数据写入会覆盖旧数据，若未读取就写入会造成未知后果
+// Circular buffer. New writes can overwrite unread data.
 public class Buffer {
   private final int capacity;
   private final byte[] buffer;
@@ -17,11 +17,11 @@ public class Buffer {
   public synchronized void write(byte[] data) {
     int remainingBytes = capacity - tail;
     if (data.length < remainingBytes) {
-      // 无需环回
+      // No wrap.
       System.arraycopy(data, 0, buffer, tail, data.length);
       tail += data.length;
     } else {
-      // 需环回
+      // Wrap.
       System.arraycopy(data, 0, buffer, tail, remainingBytes);
       tail = data.length - remainingBytes;
       System.arraycopy(data, remainingBytes, buffer, 0, tail);
@@ -36,11 +36,11 @@ public class Buffer {
     byte[] data = new byte[size];
     int remainingBytes = capacity - head;
     if (size < remainingBytes) {
-      // 无需环回
+      // No wrap.
       System.arraycopy(buffer, head, data, 0, size);
       head += size;
     } else {
-      // 需环回
+      // Wrap.
       System.arraycopy(buffer, head, data, 0, remainingBytes);
       head = size - remainingBytes;
       System.arraycopy(buffer, 0, data, remainingBytes, head);

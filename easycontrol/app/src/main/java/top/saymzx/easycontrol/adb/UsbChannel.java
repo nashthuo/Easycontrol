@@ -5,50 +5,57 @@ import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
-import android.util.Log;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 
 import top.saymzx.easycontrol.app.entity.AppData;
 
-//此处代码摘抄借鉴了梦魇兽大佬的开源软件ADB KIT(https://github.com/nightmare-space/adb_kit/blob/main/android/app/src/main/java/com/nightmare/adbtools/adblib/UsbChannel.java)
+// Based on nightmare-space's ADB KIT (https://github.com/nightmare-space/adb_kit).
 public class UsbChannel implements AdbChannel {
-
   private final UsbDeviceConnection usbConnection;
-  private UsbInterface usbInterface = null;
-  private UsbEndpoint endpointIn = null;
-  private UsbEndpoint endpointOut = null;
+  private UsbInterface usbInterface;
+  private UsbEndpoint endpointIn;
+  private UsbEndpoint endpointOut;
+  private int readTimeoutMs;
 
   public UsbChannel(UsbDevice usbDevice) throws IOException {
-    // 连接USB设备
     usbConnection = AppData.usbManager.openDevice(usbDevice);
-    // 查找ADB接口，ADB协议的Class为VENDOR_SPEC(255)
-    for (int i = 0; i < usbDevice.getInterfaceCount(); i++)
-      if (((usbInterface = usbDevice.getInterface(i)).getInterfaceClass() == UsbConstants.USB_CLASS_VENDOR_SPEC))
-        break;
-    // 宣告独占接口
-    if (usbInterface != null && usbConnection.claimInterface(usbInterface, true)) {
-      // 查找输入输出端点
-      for (int i = 0; i < usbInterface.getEndpointCount(); i++) {
-        UsbEndpoint ep = usbInterface.getEndpoint(i);
-        if (ep.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK) {
-          if (ep.getDirection() == UsbConstants.USB_DIR_OUT) this.endpointOut = ep;
-          else if (ep.getDirection() == UsbConstants.USB_DIR_IN) this.endpointIn = ep;
-          if (endpointIn != null && endpointOut != null) return;
-        }
+    if (usbConnection == null) throw new IOException("Cannot open USB device");
+    for (int i = 0; i < usbDevice.getInterfaceCount(); i++) {
+      UsbInterface candidate = usbDevice.getInterface(i);
+      if (candidate.getInterfaceClass() != UsbConstants.USB_CLASS_VENDOR_SPEC) continue;
+      UsbEndpoint input = null;
+      UsbEndpoint output = null;
+      for (int j = 0; j < candidate.getEndpointCount(); j++) {
+        UsbEndpoint endpoint = candidate.getEndpoint(j);
+        if (endpoint.getType() != UsbConstants.USB_ENDPOINT_XFER_BULK) continue;
+        if (endpoint.getDirection() == UsbConstants.USB_DIR_IN) input = endpoint;
+        else if (endpoint.getDirection() == UsbConstants.USB_DIR_OUT) output = endpoint;
+      }
+      if (input != null && output != null && usbConnection.claimInterface(candidate, true)) {
+        usbInterface = candidate;
+        endpointIn = input;
+        endpointOut = output;
+        return;
       }
     }
-    throw new IOException("有线连接错误");
+    close();
+    throw new IOException("Cannot claim USB ADB interface");
+  }
+
+  @Override
+  public void setReadTimeout(int timeoutMs) {
+    readTimeoutMs = timeoutMs;
   }
 
   @Override
   public void write(byte[] data) throws IOException {
-    int size = data.length;
-    int bytesWrite = 0;
-    while (bytesWrite < size){
-      int len=usbConnection.bulkTransfer(endpointOut, data, bytesWrite, size - bytesWrite, 1000);
-      bytesWrite +=len;
-      Log.e("aaaa", String.valueOf(len));
+    int written = 0;
+    while (written < data.length) {
+      int length = usbConnection.bulkTransfer(endpointOut, data, written, data.length - written, 1000);
+      if (length <= 0) throw new IOException("USB write failed");
+      written += length;
     }
   }
 
@@ -59,18 +66,18 @@ public class UsbChannel implements AdbChannel {
   @Override
   public byte[] read(int size) throws IOException {
     byte[] buffer = new byte[size];
-    int bytesRead = 0;
-    while (bytesRead < size)
-      bytesRead += usbConnection.bulkTransfer(endpointIn, buffer, bytesRead, size - bytesRead, 0);
+    int read = 0;
+    while (read < size) {
+      int length = usbConnection.bulkTransfer(endpointIn, buffer, read, size - read, readTimeoutMs);
+      if (length <= 0) throw new SocketTimeoutException("USB read ended or timed out");
+      read += length;
+    }
     return buffer;
   }
 
   @Override
   public void close() {
-    try {
-      usbConnection.releaseInterface(usbInterface);
-      usbConnection.close();
-    } catch (Exception ignored) {
-    }
+    if (usbInterface != null) usbConnection.releaseInterface(usbInterface);
+    usbConnection.close();
   }
 }

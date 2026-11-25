@@ -1,13 +1,11 @@
 package top.saymzx.easycontrol.app.client.view;
 
-import android.animation.Animator;
 import android.annotation.SuppressLint;
 import android.content.res.ColorStateList;
 import android.graphics.PixelFormat;
 import android.os.Build;
 import android.view.Gravity;
 import android.view.MotionEvent;
-import android.view.ViewPropertyAnimator;
 import android.view.WindowManager;
 import android.view.animation.LinearInterpolator;
 
@@ -18,13 +16,10 @@ import top.saymzx.easycontrol.app.databinding.ModuleMiniViewBinding;
 import top.saymzx.easycontrol.app.entity.AppData;
 
 public class MiniView {
+  private static final int[] BAR_COLORS = {R.color.bar1, R.color.bar2, R.color.bar3, R.color.bar4};
+  private static int nextColor;
 
-  private final ClientView clientView;
-
-  private boolean isShow = false;
-
-  // 迷你悬浮窗
-  ModuleMiniViewBinding miniView = ModuleMiniViewBinding.inflate(AppData.main.getLayoutInflater());
+  private final ModuleMiniViewBinding miniView = ModuleMiniViewBinding.inflate(AppData.main.getLayoutInflater());
   private final WindowManager.LayoutParams miniViewParams = new WindowManager.LayoutParams(
     WindowManager.LayoutParams.WRAP_CONTENT,
     WindowManager.LayoutParams.WRAP_CONTENT,
@@ -32,113 +27,60 @@ public class MiniView {
     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
     PixelFormat.TRANSLUCENT
   );
-
-  private static int color = 0;
+  private boolean isShow;
 
   public MiniView(ClientView clientView) {
-    this.clientView = clientView;
     miniViewParams.gravity = Gravity.START | Gravity.TOP;
-    // Bar颜色
-    int barColor = R.color.bar1;
-    switch (color++ % 4) {
-      case 1:
-        barColor = R.color.bar2;
-        break;
-      case 2:
-        barColor = R.color.bar3;
-        break;
-      case 3:
-        barColor = R.color.bar4;
-        break;
-    }
-    miniView.bar.setBackgroundTintList(ColorStateList.valueOf(AppData.main.getResources().getColor(barColor)));
-    // 位置
-    miniViewParams.x = -1 * AppData.publicTools.dp2px(10f);
-    miniViewParams.y = 300 * (color % 4 + 1);
+    int colorIndex = nextColor++ % BAR_COLORS.length;
+    miniView.bar.setBackgroundTintList(ColorStateList.valueOf(AppData.main.getColor(BAR_COLORS[colorIndex])));
+    miniViewParams.x = 0;
+    miniViewParams.y = 300 * (colorIndex + 1);
+    miniView.getRoot().setOnClickListener(v -> clientView.changeToSmall());
+    miniView.buttonClose.setOnClickListener(v -> clientView.hide(true));
+    setBarListener();
   }
 
   public void show() {
-    if (!isShow) {
-      isShow = true;
-      // 设置监听控制
-      setBarListener();
-      // 显示
-      showViewAnim();
-    }
+    if (isShow) return;
+    AppData.main.getWindowManager().addView(miniView.getRoot(), miniViewParams);
+    isShow = true;
+    miniView.getRoot().setTranslationX(AppData.publicTools.dp2px(-30f));
+    miniView.getRoot().setAlpha(0);
+    miniView.getRoot().animate()
+      .translationX(0)
+      .alpha(1)
+      .setDuration(400)
+      .setInterpolator(new LinearInterpolator())
+      .start();
   }
 
   public void hide() {
-    if (isShow) {
-      isShow = false;
-      showViewAnim();
-    }
+    if (!isShow) return;
+    isShow = false;
+    miniView.getRoot().animate().cancel();
+    AppData.main.getWindowManager().removeViewImmediate(miniView.getRoot());
   }
 
-  // 显示隐藏动画
-  private void showViewAnim() {
-    int width = AppData.publicTools.dp2px(-30f);
-    // 创建平移动画
-    miniView.getRoot().setTranslationX(isShow ? width : 0);
-    float endX = isShow ? 0 : width;
-    // 创建透明度动画
-    miniView.getRoot().setAlpha(isShow ? 0f : 1f);
-    float endAlpha = isShow ? 1f : 0f;
-
-    // 设置动画时长和插值器
-    ViewPropertyAnimator animator = miniView.getRoot().animate()
-      .translationX(endX)
-      .alpha(endAlpha)
-      .setDuration(400)
-      .setInterpolator(new LinearInterpolator());
-
-    // 显示或隐藏
-    animator.setListener(new Animator.AnimatorListener() {
-      @Override
-      public void onAnimationStart(Animator animation) {
-        if (isShow) AppData.main.getWindowManager().addView(miniView.getRoot(), miniViewParams);
-      }
-
-      @Override
-      public void onAnimationEnd(Animator animation) {
-        if (!isShow) AppData.main.getWindowManager().removeView(miniView.getRoot());
-      }
-
-      @Override
-      public void onAnimationCancel(Animator animation) {
-      }
-
-      @Override
-      public void onAnimationRepeat(Animator animation) {
-      }
-    });
-
-    // 启动动画
-    animator.start();
-  }
-
-  // 设置监听控制
   @SuppressLint("ClickableViewAccessibility")
   private void setBarListener() {
-    AtomicInteger yy = new AtomicInteger();
-    AtomicInteger paramsY = new AtomicInteger();
+    AtomicInteger downY = new AtomicInteger();
+    AtomicInteger windowY = new AtomicInteger();
     miniView.getRoot().setOnTouchListener((v, event) -> {
       switch (event.getActionMasked()) {
-        case MotionEvent.ACTION_DOWN: {
-          yy.set((int) event.getRawY());
-          paramsY.set(miniViewParams.y);
+        case MotionEvent.ACTION_DOWN:
+          downY.set((int) event.getRawY());
+          windowY.set(miniViewParams.y);
           break;
-        }
-        case MotionEvent.ACTION_MOVE: {
-          miniViewParams.y = paramsY.get() + (int) event.getRawY() - yy.get();
+        case MotionEvent.ACTION_MOVE:
+          int maxY = AppData.publicTools.getScreenSize().second - miniView.getRoot().getHeight();
+          miniViewParams.y = Math.max(0, Math.min(maxY, windowY.get() + (int) event.getRawY() - downY.get()));
           AppData.main.getWindowManager().updateViewLayout(miniView.getRoot(), miniViewParams);
           break;
-        }
         case MotionEvent.ACTION_UP:
-          int flipY = (int) (yy.get() - event.getRawY());
-          if (flipY * flipY < 16) clientView.changeToSmall();
+          if (Math.abs(downY.get() - event.getRawY()) < 4) v.performClick();
+          break;
       }
       return true;
     });
   }
-
 }

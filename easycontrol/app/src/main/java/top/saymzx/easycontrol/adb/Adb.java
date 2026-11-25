@@ -4,181 +4,188 @@ import android.hardware.usb.UsbDevice;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
-import java.util.Random;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
-// 此部分代码摘抄借鉴了tananaev大佬的开源代码(https://github.com/tananaev/adblib)以及开源库dadb(https://github.com/mobile-dev-inc/dadb)
-public class Adb {
+// Based on tananaev/adblib and mobile-dev-inc/dadb.
+public class Adb implements AutoCloseable {
+  public static class AuthException extends IOException {
+    AuthException(String message, Throwable cause) {
+      super(message, cause);
+    }
+  }
+
+  private static final int CONNECT_TIMEOUT_MS = 4000;
+  private static final int AUTH_TIMEOUT_MS = 60_000;
+  private static final int LIVE_TIMEOUT_MS = 12_000;
+
   private final AdbChannel channel;
-  private final Random random = new Random();
+  private final AtomicInteger nextId = new AtomicInteger(1);
   private final ConcurrentHashMap<Integer, AdbStream> connectionStreams = new ConcurrentHashMap<>();
   private final BlockingQueue<byte[]> sendQueue = new LinkedBlockingQueue<>();
+  private final AtomicBoolean closed = new AtomicBoolean();
+  private int maxPayload = 4096;
 
-  private final Thread handleIn = new Thread(this::handleIn);
-  private final Thread handleOut = new Thread(this::handleOut);
+  private final Thread handleIn = new Thread(this::handleIn, "easycontrol-adb-read");
+  private final Thread handleOut = new Thread(this::handleOut, "easycontrol-adb-write");
 
-  public Adb(String host, int port, AdbKeyPair keyPair) throws Exception {
-    channel = new TcpChannel(host, port);
-    connect(keyPair);
+  public Adb(String host, int port) throws IOException {
+    channel = new TcpChannel(host, port, CONNECT_TIMEOUT_MS);
   }
 
-  public Adb(UsbDevice usbDevice, AdbKeyPair keyPair) throws Exception {
+  public Adb(UsbDevice usbDevice) throws IOException {
     channel = new UsbChannel(usbDevice);
-    connect(keyPair);
   }
 
-  private void connect(AdbKeyPair keyPair) throws Exception {
-    // 连接ADB并认证
+  public void connect(AdbKeyPair keyPair, Runnable awaitingApproval) throws Exception {
+    channel.setReadTimeout(CONNECT_TIMEOUT_MS);
     channel.write(AdbProtocol.generateConnect());
     AdbProtocol.AdbMessage message = AdbProtocol.AdbMessage.parseAdbMessage(channel);
     if (message.command == AdbProtocol.CMD_AUTH) {
       channel.write(AdbProtocol.generateAuth(AdbProtocol.AUTH_TYPE_SIGNATURE, keyPair.signPayload(message)));
       message = AdbProtocol.AdbMessage.parseAdbMessage(channel);
       if (message.command == AdbProtocol.CMD_AUTH) {
+        channel.setReadTimeout(AUTH_TIMEOUT_MS);
         channel.write(AdbProtocol.generateAuth(AdbProtocol.AUTH_TYPE_RSA_PUBLIC, keyPair.publicKeyBytes));
-        message = AdbProtocol.AdbMessage.parseAdbMessage(channel);
+        awaitingApproval.run();
+        try {
+          message = AdbProtocol.AdbMessage.parseAdbMessage(channel);
+        } catch (SocketTimeoutException failure) {
+          throw new AuthException("ADB approval timed out", failure);
+        } catch (IOException failure) {
+          throw new AuthException("ADB approval ended", failure);
+        }
       }
     }
     if (message.command != AdbProtocol.CMD_CNXN)
-      throw new Exception("ADB连接失败: " + new String(message.payload));
-    // 启动后台进程
-    handleIn.setPriority(Thread.MAX_PRIORITY);
+      throw new AuthException("ADB did not authorize the tablet", null);
+    maxPayload = Math.min(16_384, message.arg1);
+    if (maxPayload <= 0) throw new IOException("Invalid ADB payload size");
+    channel.setReadTimeout(LIVE_TIMEOUT_MS);
+    if (closed.get()) throw new IOException("ADB connection closed");
     handleIn.start();
-    handleOut.setPriority(Thread.MAX_PRIORITY);
     handleOut.start();
   }
 
-  private AdbStream open(String destination, boolean isNeedSource, boolean canMultipleSend) throws IOException, InterruptedException {
-    int localId = random.nextInt();
-    sendQueue.offer(AdbProtocol.generateOpen(localId, destination));
-    AdbStream stream = new AdbStream(sendQueue, localId, isNeedSource, canMultipleSend);
-    connectionStreams.put(localId, stream);
-    synchronized (stream) {
-      stream.wait();
+  private AdbStream open(String destination, boolean receiveData) throws IOException, InterruptedException {
+    int id = nextId.getAndIncrement();
+    AdbStream stream = new AdbStream(sendQueue, id, maxPayload, receiveData);
+    connectionStreams.put(id, stream);
+    try {
+      if (closed.get()) throw new IOException("ADB connection closed");
+      sendQueue.offer(AdbProtocol.generateOpen(id, destination));
+      stream.awaitOpen();
+      return stream;
+    } catch (IOException | InterruptedException failure) {
+      connectionStreams.remove(id);
+      stream.close();
+      throw failure;
     }
-    if (stream.isError()) throw new IOException("打开通道失败: " + destination);
-    return stream;
   }
 
   public void pushFile(InputStream file, String remotePath) throws InterruptedException, IOException {
-    // 打开链接
-    AdbStream stream = open("sync:", false, false);
-    // 发送信令，建立push通道
-    String sendString = remotePath + ",33206";
-    byte[] bytes = sendString.getBytes();
-    ByteBuffer send = ByteBuffer.allocate(bytes.length + 8);
-    send.put(AdbProtocol.generatePushPacket("SEND", sendString.length()));
-    send.put(bytes);
-    send.flip();
-    stream.write(send);
-    // 发送文件
-    byte[] byteArray = new byte[4096 - 8];
-    int len = file.read(byteArray, 0, byteArray.length);
-    do {
-      ByteBuffer data = ByteBuffer.allocate(len + 8);
-      data.put(AdbProtocol.generatePushPacket("DATA", len));
-      data.put(byteArray, 0, len);
-      data.flip();
-      stream.write(data);
-      len = file.read(byteArray, 0, byteArray.length);
-    } while (len > 0);
-    // 传输完成
-    stream.write(AdbProtocol.generatePushPacket("DONE", (int) System.currentTimeMillis()));
-    stream.write(AdbProtocol.generatePushPacket("QUIT", 0));
-    synchronized (stream) {
-      stream.wait();
+    try (AdbStream stream = open("sync:", true)) {
+      byte[] path = (remotePath + ",33206").getBytes(StandardCharsets.UTF_8);
+      ByteBuffer start = ByteBuffer.allocate(8 + path.length);
+      start.put(AdbProtocol.generatePushPacket("SEND", path.length)).put(path);
+      start.flip();
+      stream.write(start);
+      byte[] chunk = new byte[4096 - 8];
+      int count;
+      while ((count = file.read(chunk)) != -1) {
+        ByteBuffer data = ByteBuffer.allocate(8 + count);
+        data.put(AdbProtocol.generatePushPacket("DATA", count)).put(chunk, 0, count);
+        data.flip();
+        stream.write(data);
+      }
+      stream.write(AdbProtocol.generatePushPacket("DONE", (int) (System.currentTimeMillis() / 1000)));
+      ByteBuffer response = stream.readByteArray(8).order(ByteOrder.LITTLE_ENDIAN);
+      byte[] status = new byte[4];
+      response.get(status);
+      if (!"OKAY".equals(new String(status, StandardCharsets.US_ASCII)))
+        throw new IOException("ADB could not write the file");
     }
-    file.close();
   }
 
-  public String runAdbCmd(String cmd, boolean isNeedOutput) throws IOException, InterruptedException {
-    if (!isNeedOutput) {
-      if (connectionStreams.get(0) == null) connectionStreams.put(0, open("shell:", false, true));
-      connectionStreams.get(0).write(ByteBuffer.wrap((cmd + "\n").getBytes()));
-      return "";
-    } else {
-      AdbStream stream = open("shell:" + cmd, true, true);
-      synchronized (stream) {
-        stream.wait();
-      }
+  public String runAdbCmd(String command) throws IOException, InterruptedException {
+    try (AdbStream stream = open("shell:" + command, true)) {
+      stream.awaitClose();
+      if (closed.get()) throw new IOException("ADB connection closed");
       return stream.readString();
     }
   }
 
-  public AdbStream tcpForward(int port, boolean isNeedSource) throws IOException, InterruptedException {
-    return open("tcp:" + port, isNeedSource, true);
+  public AdbStream startShell(String command) throws IOException, InterruptedException {
+    return open("shell:" + command, false);
   }
 
-  public AdbStream localSocketForward(String socketName, boolean isNeedSource) throws IOException, InterruptedException {
-    return open("localabstract:" + socketName, isNeedSource, true);
+  public AdbStream localSocketForward(String socketName) throws IOException, InterruptedException {
+    return open("localabstract:" + socketName, true);
   }
 
   private void handleIn() {
     try {
-      while (!Thread.interrupted()) {
+      while (!Thread.currentThread().isInterrupted()) {
         AdbProtocol.AdbMessage message = AdbProtocol.AdbMessage.parseAdbMessage(channel);
         AdbStream stream = connectionStreams.get(message.arg1);
-        if (stream == null) return;
+        if (stream == null) {
+          if (message.command == AdbProtocol.CMD_OKAY)
+            sendQueue.offer(AdbProtocol.generateClose(message.arg1, message.arg0));
+          continue;
+        }
         switch (message.command) {
           case AdbProtocol.CMD_OKAY:
-            stream.setCanWrite(message.arg0);
+            stream.acknowledge(message.arg0);
             break;
           case AdbProtocol.CMD_WRTE:
             sendQueue.offer(AdbProtocol.generateOkay(message.arg1, message.arg0));
-            stream.pushSource(message.payload);
+            stream.receive(message.payload);
             break;
           case AdbProtocol.CMD_CLSE:
+            connectionStreams.remove(message.arg1);
             stream.close();
+            break;
+          default:
             break;
         }
       }
     } catch (IOException | InterruptedException ignored) {
+    } finally {
       close();
     }
   }
 
   private void handleOut() {
     try {
-      ByteBuffer buffer = ByteBuffer.allocate(8192);
-      byte[] bytes;
-      while (!Thread.interrupted()) {
-        buffer.clear();
-        // 阻塞等待数据
-        buffer.put(sendQueue.take());
-        // 将所有数据清空，以减少写入次数
-        while ((bytes = sendQueue.peek()) != null) {
-          if (bytes.length > buffer.remaining()) break;
-          buffer.put(sendQueue.take());
-        }
-        buffer.flip();
-        bytes = new byte[buffer.remaining()];
-        buffer.get(bytes);
-        channel.write(bytes);
+      while (!Thread.currentThread().isInterrupted()) {
+        channel.write(sendQueue.take());
         channel.flush();
       }
     } catch (IOException | InterruptedException ignored) {
+    } finally {
       close();
     }
   }
 
-  public void sendMoreOk(AdbStream stream) {
-    sendQueue.offer(AdbProtocol.generateOkay(stream.localId, stream.remoteId));
+  public boolean isClosed() {
+    return closed.get();
   }
 
-  private boolean isClosed = false;
-
+  @Override
   public void close() {
-    if (isClosed) return;
-    isClosed = true;
+    if (!closed.compareAndSet(false, true)) return;
     handleIn.interrupt();
     handleOut.interrupt();
-    for (AdbStream value : connectionStreams.values()) value.close();
-    try {
-      channel.close();
-    } catch (Exception ignored) {
-    }
+    channel.close();
+    for (AdbStream stream : connectionStreams.values()) stream.close();
+    connectionStreams.clear();
+    sendQueue.clear();
   }
 }

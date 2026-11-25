@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Base UI text preserved from the original layouts and Java. -->
+  <string name="main_device_type_link">有线设备</string>
+  <string name="toast_float_per">请授予悬浮窗权限</string>
+
+  <string name="set_defaults">默认参数</string>
+  <string name="set_display">显示</string>
+  <string name="set_other">其他</string>
+  <string name="set_about">关于</string>
+  <string name="set_auto_control_screen">自动屏幕控制</string>
+  <string name="set_clear_default">清除默认设备</string>
+  <string name="set_other_reset_key">重新生成密钥(需重新授权)</string>
+  <string name="set_other_ip">本机地址</string>
+  <string name="set_about_help">使用说明</string>
+  <string name="set_about_privacy">隐私政策</string>
+  <string name="set_about_version">版本: %1$s</string>
+  <string name="toast_default_cleared">已清除</string>
+  <string name="toast_key_reset">已刷新</string>
+  <string name="toast_no_browser">没有默认浏览器</string>
+
+  <string name="ip_ipv4">IPv4: (点击复制)</string>
+  <string name="ip_ipv6">IPv6: (点击复制)</string>
+  <string name="toast_copy">已复制</string>
+
+  <string name="device_name">设备名称:</string>
+  <string name="device_name_hint">不可为空</string>
+  <string name="device_address_with_port">地址:端口号</string>
+  <string name="device_address_with_port_hint">支持IPv4/v6地址、域名</string>
+  <string name="device_is_audio">使能音频</string>
+  <string name="device_advanced">高级选项</string>
+  <string name="device_max_size">最大大小</string>
+  <string name="device_max_fps">最大帧率</string>
+  <string name="device_max_video_bit">最大码率</string>
+  <string name="device_change_resolution_on_running">修改分辨率</string>
+  <string name="device_light_off_on_connect">熄屏控制</string>
+  <string name="device_change_to_full_on_connect">默认全屏启动</string>
+  <string name="device_button">确认</string>
+  <string name="set_device_title">设备详情</string>
+  <string name="set_device_open">打开</string>
+  <string name="set_device_default">设为默认</string>
+  <string name="set_device_button_change">修改</string>
+  <string name="set_device_button_delete">删除</string>
+
+  <string name="loading_text">加载中\n点击文本取消</string>
+  <string name="toast_fullscreen_back">全屏状态会拦截返回</string>
+  <string name="toast_fullscreen_busy">有设备正在全屏控制</string>
+</resources>

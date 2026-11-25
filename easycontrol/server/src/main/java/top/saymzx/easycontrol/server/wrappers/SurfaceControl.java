@@ -1,5 +1,5 @@
 /*
- * 本项目大量借鉴学习了开源投屏软件：Scrcpy，在此对该项目表示感谢
+ * This project draws on the open source scrcpy project.
  */
 package top.saymzx.easycontrol.server.wrappers;
 
@@ -15,12 +15,12 @@ import java.lang.reflect.Method;
 @SuppressLint("PrivateApi")
 public final class SurfaceControl {
 
+  public static final int POWER_MODE_OFF = 0;
+  public static final int POWER_MODE_NORMAL = 2;
   private static Class<?> CLASS;
 
   private static Method getBuiltInDisplayMethod;
   private static Method setDisplayPowerModeMethod;
-  private static Method getPhysicalDisplayTokenMethod;
-  private static Method getPhysicalDisplayIdsMethod;
 
   public static void init() throws ClassNotFoundException, NoSuchMethodException {
     CLASS = Class.forName("android.view.SurfaceControl");
@@ -28,10 +28,6 @@ public final class SurfaceControl {
       getBuiltInDisplayMethod = CLASS.getMethod("getBuiltInDisplay", int.class);
     } else {
       getBuiltInDisplayMethod = CLASS.getMethod("getInternalDisplayToken");
-    }
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      getPhysicalDisplayTokenMethod = CLASS.getMethod("getPhysicalDisplayToken", long.class);
-      getPhysicalDisplayIdsMethod = CLASS.getMethod("getPhysicalDisplayIds");
     }
     setDisplayPowerModeMethod = CLASS.getMethod("setDisplayPowerMode", IBinder.class, int.class);
   }
@@ -76,27 +72,19 @@ public final class SurfaceControl {
     }
   }
 
-  public static IBinder getPhysicalDisplayToken(long physicalDisplayId) {
-    try {
-      return (IBinder) getPhysicalDisplayTokenMethod.invoke(null, physicalDisplayId);
-    } catch (Exception e) {
-      return null;
-    }
-  }
-
-  public static long[] getPhysicalDisplayIds() {
-    try {
-      return (long[]) getPhysicalDisplayIdsMethod.invoke(null);
-    } catch (Exception e) {
-      return null;
-    }
-  }
-
-  public static void setDisplayPowerMode(IBinder displayToken, int mode) {
+  private static boolean setDisplayPowerMode(IBinder displayToken, int mode) {
+    if (displayToken == null) return false;
     try {
       setDisplayPowerModeMethod.invoke(null, displayToken, mode);
+      return true;
     } catch (Exception ignored) {
+      return false;
     }
+  }
+
+  public static boolean setPhysicalDisplayPowerMode(int mode) {
+    // Only change the built-in screen. Leave other physical displays alone.
+    return setDisplayPowerMode(getBuiltInDisplay(), mode);
   }
 
 }

@@ -1,5 +1,5 @@
 /*
- * 本项目大量借鉴学习了开源投屏软件：Scrcpy，在此对该项目表示感谢
+ * This project draws on the open source scrcpy project.
  */
 package top.saymzx.easycontrol.server.entity;
 
@@ -19,7 +19,7 @@ public final class PointersState {
   public final MotionEvent.PointerCoords[] pointerCoords = new MotionEvent.PointerCoords[MAX_POINTERS];
 
   public PointersState() {
-    // 初始化指针
+    // Initialize the pointer.
     for (int i = 0; i < MAX_POINTERS; ++i) {
       MotionEvent.PointerProperties props = new MotionEvent.PointerProperties();
       props.toolType = MotionEvent.TOOL_TYPE_FINGER;

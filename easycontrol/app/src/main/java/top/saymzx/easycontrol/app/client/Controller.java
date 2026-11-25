@@ -3,7 +3,6 @@ package top.saymzx.easycontrol.app.client;
 import static android.content.ClipDescription.MIMETYPE_TEXT_PLAIN;
 
 import android.content.ClipData;
-import android.util.Log;
 import android.view.MotionEvent;
 
 import java.io.IOException;
@@ -12,106 +11,73 @@ import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 import top.saymzx.easycontrol.adb.AdbStream;
-import top.saymzx.easycontrol.app.client.view.ClientView;
 import top.saymzx.easycontrol.app.entity.AppData;
 
 public class Controller {
-  private final ClientView clientView;
   private final AdbStream stream;
+  private final Runnable onLinkLost;
+  private volatile String clipboardText = "";
 
-  public Controller(ClientView clientView, AdbStream stream) {
-    this.clientView = clientView;
+  public Controller(AdbStream stream, Runnable onLinkLost) {
     this.stream = stream;
+    this.onLinkLost = onLinkLost;
   }
 
-  // 剪切板
-  private String nowClipboardText = "";
-
   public void checkClipBoard() {
-    ClipData clipBoard = AppData.clipBoard.getPrimaryClip();
-    if (clipBoard != null && clipBoard.getItemCount() > 0) {
-      String newClipBoardText = clipBoard.getItemAt(0).getText().toString();
-      if (!Objects.equals(nowClipboardText, newClipBoardText)) {
-        nowClipboardText = newClipBoardText;
-        sendClipboardEvent();
-      }
-    }
+    ClipData clipboard = AppData.clipBoard.getPrimaryClip();
+    if (clipboard == null || clipboard.getItemCount() == 0) return;
+    CharSequence text = clipboard.getItemAt(0).getText();
+    if (text == null || Objects.equals(clipboardText, text.toString())) return;
+    clipboardText = text.toString();
+    byte[] bytes = clipboardText.getBytes(StandardCharsets.UTF_8);
+    if (bytes.length > 5000) return;
+    ByteBuffer buffer = ByteBuffer.allocate(5 + bytes.length);
+    buffer.put((byte) 3).putInt(bytes.length).put(bytes);
+    buffer.flip();
+    writeStream(buffer);
   }
 
   public void handleClipboardEvent() throws InterruptedException, IOException {
     int size = stream.readInt();
-    nowClipboardText = new String(stream.readByteArray(size).array());
-    AppData.clipBoard.setPrimaryClip(ClipData.newPlainText(MIMETYPE_TEXT_PLAIN, nowClipboardText));
+    if (size < 0 || size > 5000) throw new IOException("Invalid clipboard message");
+    clipboardText = new String(stream.readByteArray(size).array(), StandardCharsets.UTF_8);
+    AppData.clipBoard.setPrimaryClip(ClipData.newPlainText(MIMETYPE_TEXT_PLAIN, clipboardText));
   }
 
-  // 处理旋转
-  public void handleRotationNotification() {
-    AppData.main.runOnUiThread(clientView::changeRotation);
-  }
-
-  // 发送触摸事件
-  public void sendTouchEvent(int action, int p, float x, float y) {
+  public void sendTouchEvent(int action, int pointerId, float x, float y) {
     if (x < 0 || x > 1 || y < 0 || y > 1) {
-      // 超出范围则改为抬起事件
-      if (x < 0) x = 0;
-      if (x > 1) x = 1;
-      if (y < 0) y = 0;
-      if (y > 1) y = 1;
+      x = Math.max(0, Math.min(1, x));
+      y = Math.max(0, Math.min(1, y));
       action = MotionEvent.ACTION_UP;
     }
-    ByteBuffer byteBuffer = ByteBuffer.allocate(11);
-    // 触摸事件
-    byteBuffer.put((byte) 1);
-    // 触摸类型
-    byteBuffer.put((byte) action);
-    // pointerId
-    byteBuffer.put((byte) p);
-    // 坐标位置
-    byteBuffer.putFloat(x);
-    byteBuffer.putFloat(y);
-    byteBuffer.flip();
-    writeStream(byteBuffer);
+    ByteBuffer buffer = ByteBuffer.allocate(11);
+    buffer.put((byte) 1).put((byte) action).put((byte) pointerId).putFloat(x).putFloat(y);
+    buffer.flip();
+    writeStream(buffer);
   }
 
-  // 发送按键事件
   public void sendKeyEvent(int key) {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(5);
-    // 输入事件
-    byteBuffer.put((byte) 2);
-    // 按键类型
-    byteBuffer.putInt(key);
-    byteBuffer.flip();
-    writeStream(byteBuffer);
+    ByteBuffer buffer = ByteBuffer.allocate(5);
+    buffer.put((byte) 2).putInt(key);
+    buffer.flip();
+    writeStream(buffer);
   }
 
-  // 发送剪切板事件
-  private void sendClipboardEvent() {
-    byte[] tmpTextByte = nowClipboardText.getBytes(StandardCharsets.UTF_8);
-    if (tmpTextByte.length > 5000) return;
-    ByteBuffer byteBuffer = ByteBuffer.allocate(5 + tmpTextByte.length);
-    byteBuffer.put((byte) 3);
-    byteBuffer.putInt(tmpTextByte.length);
-    byteBuffer.put(tmpTextByte);
-    byteBuffer.flip();
-    writeStream(byteBuffer);
-  }
-
-  // 发送心跳包
   public void sendKeepAlive() {
     writeStream(ByteBuffer.wrap(new byte[]{4}));
   }
 
-  // 发送按键事件
   public void sendPowerEvent() {
     writeStream(ByteBuffer.wrap(new byte[]{5}));
   }
 
-  private void writeStream(ByteBuffer byteBuffer) {
+  private void writeStream(ByteBuffer buffer) {
     try {
-      stream.write(byteBuffer);
-    } catch (IOException | InterruptedException ignored) {
-      AppData.main.runOnUiThread(() -> clientView.hide(true));
+      stream.write(buffer);
+    } catch (InterruptedException ignored) {
+      Thread.currentThread().interrupt();
+    } catch (IOException ignored) {
+      onLinkLost.run();
     }
   }
-
 }

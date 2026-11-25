@@ -34,6 +34,7 @@
         android:layout_width="26dp"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:contentDescription="@string/mirror_recent_apps"
         android:src="@drawable/menu"
         android:tint="#fff" />
 
@@ -42,6 +43,7 @@
         android:layout_width="26dp"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:contentDescription="@string/mirror_home"
         android:src="@drawable/home"
         android:tint="#fff" />
 
@@ -50,6 +52,7 @@
         android:layout_width="26dp"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:contentDescription="@string/mirror_back"
         android:src="@drawable/back"
         android:tint="#fff" />
 
@@ -57,6 +60,7 @@
         android:id="@+id/button_more"
         android:layout_width="26dp"
         android:layout_height="40dp"
+        android:contentDescription="@string/mirror_controls"
         android:src="@drawable/more"
         android:tint="#fff" />
 
@@ -68,13 +72,14 @@
     android:layout_width="50dp"
     android:layout_height="20dp"
     android:layout_gravity="end|top"
+    android:contentDescription="@string/mirror_hide_navigation"
     android:src="@drawable/full_bar_land"
     android:tint="@color/clientBar"
     android:visibility="gone" />
 
   <GridLayout
     android:id="@+id/bar_view"
-    android:layout_width="110dp"
+    android:layout_width="176dp"
     android:layout_height="wrap_content"
     android:layout_gravity="bottom|end"
     android:layout_marginEnd="40dp"
@@ -82,13 +87,15 @@
     android:background="@drawable/background_cron"
     android:backgroundTint="@color/cardBackground"
     android:columnCount="3"
-    android:padding="8dp">
+    android:padding="8dp"
+    android:visibility="gone">
 
     <ImageView
       android:id="@+id/button_mini"
       android:layout_width="26dp"
       android:layout_height="26dp"
       android:layout_columnWeight="1"
+      android:contentDescription="@string/mirror_minimize"
       android:src="@drawable/mini"
       android:tint="@color/onCardBackground" />
 
@@ -97,26 +104,16 @@
       android:layout_width="26dp"
       android:layout_height="26dp"
       android:layout_columnWeight="1"
+      android:contentDescription="@string/mirror_windowed"
       android:src="@drawable/fullscreen_exit"
       android:tint="@color/onCardBackground" />
 
     <ImageView
-      android:id="@+id/button_close"
+      android:id="@+id/button_display"
       android:layout_width="26dp"
       android:layout_height="26dp"
       android:layout_columnWeight="1"
-      android:src="@drawable/close"
-      android:tint="@color/buttonSecond" />
-
-    <Space
-      android:layout_height="8dp"
-      android:layout_columnSpan="3" />
-
-    <ImageView
-      android:id="@+id/button_power"
-      android:layout_width="26dp"
-      android:layout_height="26dp"
-      android:layout_columnWeight="1"
+      android:contentDescription="@string/mirror_display"
       android:src="@drawable/power"
       android:tint="@color/onCardBackground" />
 
@@ -125,8 +122,27 @@
       android:layout_width="26dp"
       android:layout_height="26dp"
       android:layout_columnWeight="1"
+      android:contentDescription="@string/mirror_hide_navigation"
       android:src="@drawable/to_line"
       android:tint="@color/onCardBackground" />
 
+    <Space
+      android:layout_height="8dp"
+      android:layout_columnSpan="3" />
+
+    <include
+      android:id="@+id/key_controls"
+      layout="@layout/mirror_key_buttons"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_columnSpan="3" />
+
   </GridLayout>
+
+  <ImageButton
+    android:id="@+id/button_close"
+    style="@style/MirrorCloseButton"
+    android:layout_gravity="top|end"
+    android:layout_marginTop="8dp"
+    android:layout_marginEnd="8dp" />
 </FrameLayout>

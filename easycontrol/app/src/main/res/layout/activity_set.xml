@@ -41,7 +41,7 @@
                 android:layout_marginStart="20dp"
                 android:layout_marginTop="20dp"
                 android:layout_marginBottom="10dp"
-                android:text="默认参数"
+                android:text="@string/set_defaults"
                 android:textColor="@color/onBackground"
                 android:textSize="@dimen/largeFont"
                 tools:ignore="HardcodedText" />
@@ -64,7 +64,7 @@
                 android:layout_marginStart="20dp"
                 android:layout_marginTop="12dp"
                 android:layout_marginBottom="10dp"
-                android:text="显示"
+                android:text="@string/set_display"
                 android:textColor="@color/onBackground"
                 android:textSize="@dimen/largeFont" />
 
@@ -86,7 +86,7 @@
                 android:layout_marginStart="20dp"
                 android:layout_marginTop="12dp"
                 android:layout_marginBottom="10dp"
-                android:text="其他"
+                android:text="@string/set_other"
                 android:textColor="@color/onBackground"
                 android:textSize="@dimen/largeFont" />
 
@@ -108,7 +108,7 @@
                 android:layout_marginStart="20dp"
                 android:layout_marginTop="12dp"
                 android:layout_marginBottom="10dp"
-                android:text="关于"
+                android:text="@string/set_about"
                 android:textColor="@color/onBackground"
                 android:textSize="@dimen/largeFont" />
 

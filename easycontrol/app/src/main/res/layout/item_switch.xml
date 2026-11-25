@@ -13,7 +13,7 @@
         android:id="@+id/item_switch_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="是否修改分辨率:"
+
         android:textColor="@color/onCardBackground"
         android:textSize="@dimen/middleFont"
         tools:ignore="HardcodedText" />

@@ -28,7 +28,7 @@
     android:layout_weight="1"
     android:includeFontPadding="false"
     android:maxLines="1"
-    android:text="有线设备"
+    android:text="@string/main_device_type_link"
     android:textColor="@color/onCardBackground"
     android:textSize="@dimen/largeFont"
     tools:ignore="HardcodedText" />

@@ -15,7 +15,7 @@
     android:layout_height="wrap_content"
     android:layout_gravity="center"
     android:gravity="center"
-    android:text="加载中\n点击文本取消"
+    android:text="@string/loading_text"
     android:textColor="@color/onCardBackground"
     android:textSize="@dimen/largeFont"
     android:textStyle="bold" />

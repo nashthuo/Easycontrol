@@ -1,7 +1,9 @@
 /*
- * 本项目大量借鉴学习了开源投屏软件：Scrcpy，在此对该项目表示感谢
+ * This project draws on the open source scrcpy project.
  */
 package top.saymzx.easycontrol.server.entity;
+
+import top.saymzx.easycontrol.server.ServerText;
 
 public final class Options {
   public static boolean isAudio;
@@ -10,18 +12,26 @@ public final class Options {
   public static int maxFps;
   public static boolean turnOffScreen;
   public static boolean autoControlScreen;
-  public static int setWidth;
-  public static int setHeight;
+  public static int setWidth = -1;
+  public static boolean resolutionChanged;
+  public static String socketName = "easycontrol";
+  public static int setHeight = -1;
 
   public static void parse(String... args) {
     for (String arg : args) {
       int equalIndex = arg.indexOf('=');
       if (equalIndex == -1) {
-        throw new IllegalArgumentException("参数格式错误");
+        throw new IllegalArgumentException(ServerText.get("invalid_arg"));
       }
       String key = arg.substring(0, equalIndex);
       String value = arg.substring(equalIndex + 1);
       switch (key) {
+        case "socket_name":
+          if (!value.matches("[a-zA-Z0-9_-]{1,80}")) {
+            throw new IllegalArgumentException(ServerText.get("invalid_arg"));
+          }
+          socketName = value;
+          break;
         case "is_audio":
           isAudio = Integer.parseInt(value) == 1;
           break;

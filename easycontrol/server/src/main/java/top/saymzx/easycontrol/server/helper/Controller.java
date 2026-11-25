@@ -1,11 +1,12 @@
 /*
- * 本项目大量借鉴学习了开源投屏软件：Scrcpy，在此对该项目表示感谢
+ * This project draws on the open source scrcpy project.
  */
 package top.saymzx.easycontrol.server.helper;
 
-import java.io.BufferedReader;
+import android.os.SystemClock;
+import android.view.KeyEvent;
+
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
 import top.saymzx.easycontrol.server.Server;
@@ -48,7 +49,7 @@ public final class Controller {
 
   private static void handleKeyEvent() throws IOException {
     int keyCode = Server.streamIn.readInt();
-    Device.keyEvent(keyCode);
+    sendKey(keyCode);
   }
 
   private static void handleClipboardEvent() throws IOException {
@@ -59,27 +60,34 @@ public final class Controller {
     Device.setClipboardText(text);
   }
 
-  public static long lastKeepAliveTime = System.currentTimeMillis();
+  public static volatile long lastKeepAliveTime = SystemClock.elapsedRealtime();
 
   private static void handleKeepAlive() {
-    lastKeepAliveTime = System.currentTimeMillis();
+    lastKeepAliveTime = SystemClock.elapsedRealtime();
   }
 
   private static void handlePower() {
-    Device.keyEvent(26);
+    sendKey(KeyEvent.KEYCODE_POWER);
   }
 
-  public static void checkScreenOff(boolean turnOn) throws IOException {
-    Process process = new ProcessBuilder().command("sh", "-c", "dumpsys deviceidle | grep mScreenOn").start();
-    String output = new BufferedReader(new InputStreamReader(process.getInputStream())).readLine();
-    Boolean isScreenOn = null;
-    if (output.contains("mScreenOn=true")) isScreenOn = true;
-    else if (output.contains("mScreenOn=false")) isScreenOn = false;
-    if (isScreenOn != null) {
-      // 如果屏幕状态和要求状态不同，则模拟按下电源键
-      if (isScreenOn ^ turnOn) Device.keyEvent(26);
+  private static boolean manualPowerControl;
+  private static boolean blankingPaused;
+
+  private static synchronized void sendKey(int keyCode) {
+    if (keyCode == KeyEvent.KEYCODE_POWER || keyCode == KeyEvent.KEYCODE_WAKEUP) {
+      manualPowerControl = keyCode == KeyEvent.KEYCODE_POWER;
+      blankingPaused = true;
+      Server.setDisplayBlanked(false);
     }
+    Device.keyEvent(keyCode);
   }
 
-}
+  public static synchronized void maintainScreen() {
+    wakeForCapture();
+    if (Options.turnOffScreen && !blankingPaused) Server.setDisplayBlanked(true);
+  }
 
+  public static void wakeForCapture() {
+    if (Options.autoControlScreen && !manualPowerControl) Device.keyEvent(KeyEvent.KEYCODE_WAKEUP);
+  }
+}

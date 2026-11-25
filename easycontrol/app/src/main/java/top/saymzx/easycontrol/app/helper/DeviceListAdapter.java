@@ -49,11 +49,8 @@ public class DeviceListAdapter extends BaseAdapter {
     }
     ItemDevicesItemBinding devicesItemBinding = (ItemDevicesItemBinding) view.getTag();
     Device device = devices.get(i);
-    // 设置卡片值
     devicesItemBinding.deviceName.setText(device.name);
-    // 单击事件
     devicesItemBinding.getRoot().setOnClickListener(v -> new Client(device, null));
-    // 长按事件
     devicesItemBinding.getRoot().setOnLongClickListener(v -> {
       onLongClickCard(device);
       return true;
@@ -61,25 +58,25 @@ public class DeviceListAdapter extends BaseAdapter {
     return view;
   }
 
-  // 卡片长按事件
   private void onLongClickCard(Device device) {
     ItemSetDeviceBinding itemSetDeviceBinding = ItemSetDeviceBinding.inflate(LayoutInflater.from(context));
     Dialog dialog = AppData.publicTools.createDialog(context,true, itemSetDeviceBinding.getRoot());
     itemSetDeviceBinding.open.setOnClickListener(v -> {
-      dialog.hide();
+      dialog.dismiss();
       new Client(device, null);
     });
     itemSetDeviceBinding.defult.setOnClickListener(v -> {
-      dialog.hide();
+      dialog.dismiss();
       AppData.setting.setDefaultDevice(device.id);
     });
     itemSetDeviceBinding.delete.setOnClickListener(v -> {
       AppData.dbHelper.delete(device);
+      if (AppData.setting.getDefaultDevice() == device.id) AppData.setting.setDefaultDevice(-1);
       update();
-      dialog.hide();
+      dialog.dismiss();
     });
     itemSetDeviceBinding.change.setOnClickListener(v -> {
-      dialog.hide();
+      dialog.dismiss();
       Dialog addDeviceDialog = AppData.publicTools.createAddDeviceView(context, device, this);
       addDeviceDialog.show();
     });

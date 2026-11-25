@@ -1,5 +1,5 @@
 /*
- * 本项目大量借鉴学习了开源投屏软件：Scrcpy，在此对该项目表示感谢
+ * This project draws on the open source scrcpy project.
  */
 package top.saymzx.easycontrol.server;
 
@@ -8,16 +8,23 @@ import android.net.LocalServerSocket;
 import android.net.LocalSocket;
 import android.os.IBinder;
 import android.os.IInterface;
+import android.os.SystemClock;
 import android.system.ErrnoException;
+import android.util.Log;
 import android.system.Os;
 
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import top.saymzx.easycontrol.server.entity.Device;
 import top.saymzx.easycontrol.server.entity.Options;
@@ -30,108 +37,118 @@ import top.saymzx.easycontrol.server.wrappers.InputManager;
 import top.saymzx.easycontrol.server.wrappers.SurfaceControl;
 import top.saymzx.easycontrol.server.wrappers.WindowManager;
 
-// 此部分代码摘抄借鉴了著名投屏软件Scrcpy的开源代码(https://github.com/Genymobile/scrcpy/tree/master/server)
+// The server uses techniques from https://github.com/Genymobile/scrcpy/tree/master/server.
 public final class Server {
+  private static final String LOG_TAG = "EasycontrolServer";
+  private static final long STARTUP_TIMEOUT_MS = 20_000;
+  private static final long KEEPALIVE_TIMEOUT_MS = 5_000;
+  private static final CountDownLatch started = new CountDownLatch(1);
+  private static final CountDownLatch stopped = new CountDownLatch(1);
   private static LocalSocket socket;
   private static FileDescriptor fileDescriptor;
   public static DataInputStream streamIn;
-
-  public static final Object object = new Object();
-
-  private static boolean startSuccess = false;
+  private static final DisplayPower displayPower = new DisplayPower();
 
   public static void main(String... args) {
-    // 启动超时
-    new Thread(() -> {
+    Thread startupWatchdog = new Thread(() -> {
       try {
-        Thread.sleep(8000);
+        if (!started.await(STARTUP_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+          Log.e(LOG_TAG, ServerText.get("startup_timeout"));
+          android.os.Process.killProcess(android.os.Process.myPid());
+        }
       } catch (InterruptedException ignored) {
       }
-      if (!startSuccess) release();
-    }).start();
+    }, "easycontrol-startup");
+    startupWatchdog.setDaemon(true);
+    startupWatchdog.start();
+
+    List<Thread> workers = new ArrayList<>();
+    int status = 0;
     try {
-      // 解析参数
       Options.parse(args);
-      // 初始化
       setManagers();
-      Device.init();
-      // 连接
       connectClient();
-      // 初始化子服务
+      Device.init();
+      Controller.wakeForCapture();
       VideoEncode.init();
       boolean canAudio = AudioEncode.init();
-      // 启动
-      Thread videoOutThread = new Thread(Server::executeVideoOut);
-      videoOutThread.setPriority(Thread.MAX_PRIORITY);
-      Thread audioInThread = new Thread(Server::executeAudioIn);
-      audioInThread.setPriority(Thread.MAX_PRIORITY);
-      Thread audioOutThread = new Thread(Server::executeAudioOut);
-      audioOutThread.setPriority(Thread.MAX_PRIORITY);
-      Thread controlInThread = new Thread(Server::executeControlIn);
-      controlInThread.setPriority(Thread.MAX_PRIORITY);
-      Thread otherServiceThread = new Thread(Server::executeOtherService);
-      videoOutThread.start();
-      controlInThread.start();
-      otherServiceThread.start();
+      if (Options.turnOffScreen) displayPower.startGuard();
+      Device.startListeners();
+      Controller.lastKeepAliveTime = SystemClock.elapsedRealtime();
+      workers.add(new Thread(() -> runWorker(Server::executeVideoOut), "easycontrol-video"));
+      workers.add(new Thread(() -> runWorker(Server::executeControlIn), "easycontrol-input"));
+      workers.add(new Thread(() -> runWorker(Server::executeOtherService), "easycontrol-keepalive"));
       if (canAudio) {
-        audioInThread.start();
-        audioOutThread.start();
+        workers.add(new Thread(() -> runWorker(Server::executeAudioIn), "easycontrol-audio-in"));
+        workers.add(new Thread(() -> runWorker(Server::executeAudioOut), "easycontrol-audio-out"));
       }
-      startSuccess = true;
-      // 程序运行
-      synchronized (object) {
-        object.wait();
-      }
-      // 终止子服务
-      videoOutThread.interrupt();
-      controlInThread.interrupt();
-      otherServiceThread.interrupt();
-      if (canAudio) {
-        audioInThread.interrupt();
-        audioOutThread.interrupt();
-      }
-    } catch (Exception ignored) {
+      for (Thread worker : workers) worker.start();
+      started.countDown();
+      stopped.await();
+    } catch (Throwable error) {
+      Log.e(LOG_TAG, ServerText.get("session_failed"), error);
+      status = 1;
     } finally {
-      // 释放资源
-      release();
+      release(workers);
+    }
+    System.exit(status);
+  }
+
+  public static void requestStop(Exception error) {
+    if (stopped.getCount() != 0 && !(error instanceof InterruptedException)
+        && !(error instanceof EOFException)) {
+      Log.e(LOG_TAG, ServerText.get("session_failed"), error);
+    }
+    stopped.countDown();
+  }
+
+  @FunctionalInterface
+  private interface Service {
+    void run() throws Exception;
+  }
+
+  private static void runWorker(Service service) {
+    try {
+      service.run();
+    } catch (Exception error) {
+      requestStop(error);
+    } finally {
+      stopped.countDown();
     }
   }
 
-  // 关闭
-  private static void release() {
-    for (int i = 0; i < 7; i++) {
+  private static void release(List<Thread> workers) {
+    stopped.countDown();
+    for (Thread worker : workers) worker.interrupt();
+    if (socket != null) {
       try {
-        switch (i) {
-          case 0:
-            streamIn.close();
-            socket.close();
-            break;
-          case 1:
-            // 恢复分辨率
-            if (Options.setWidth != -1)
-              new ProcessBuilder().command("sh", "-c", "wm size reset").start();
-          case 2:
-            SurfaceControl.destroyDisplay(VideoEncode.display);
-            break;
-          case 3:
-            if (Options.autoControlScreen) Controller.checkScreenOff(false);
-            Device.setScreenPowerMode(1);
-            break;
-          case 4:
-            VideoEncode.encedec.stop();
-            VideoEncode.encedec.release();
-            break;
-          case 5:
-            AudioEncode.audioCapture.stop();
-            AudioEncode.audioCapture.release();
-            AudioEncode.encedec.stop();
-            AudioEncode.encedec.release();
-            break;
-          case 6:
-            new ProcessBuilder().command("sh", "-c", "ps -ef | grep easycontrol | grep -v grep | grep -E \"^[a-z]+ +[0-9]+\" -o | grep -E \"[0-9]+\" -o | xargs kill -9").start();
-        }
-      } catch (Exception ignored) {
+        socket.close();
+      } catch (IOException ignored) {
       }
+    }
+
+    // Restore display power before waiting on any codec or input worker.
+    displayPower.restore();
+
+    boolean allStopped = true;
+    for (Thread worker : workers) {
+      try {
+        worker.join(200);
+      } catch (InterruptedException ignored) {
+        Thread.currentThread().interrupt();
+      }
+      allStopped &= !worker.isAlive();
+    }
+    if (Options.resolutionChanged) {
+      try {
+        new ProcessBuilder("wm", "size", "reset").start().waitFor();
+      } catch (IOException | InterruptedException error) {
+        Log.w(LOG_TAG, ServerText.get("resolution_failed"), error);
+      }
+    }
+    if (allStopped) {
+      VideoEncode.release();
+      AudioEncode.release();
     }
   }
 
@@ -169,74 +186,48 @@ public final class Server {
   }
 
   private static void connectClient() throws IOException {
-    try (LocalServerSocket serverSocket = new LocalServerSocket("easycontrol")) {
+    try (LocalServerSocket serverSocket = new LocalServerSocket(Options.socketName)) {
       socket = serverSocket.accept();
       fileDescriptor = socket.getFileDescriptor();
       streamIn = new DataInputStream(socket.getInputStream());
     }
   }
 
-  private static void executeVideoOut() {
-    try {
-      while (!Thread.interrupted()) {
-        if (VideoEncode.isHasChangeRotation) {
-          VideoEncode.isHasChangeRotation = false;
-          VideoEncode.stopEncode();
-          VideoEncode.initEncode();
-        }
-        VideoEncode.encodeOut();
+  private static void executeVideoOut() throws Exception {
+    while (!Thread.currentThread().isInterrupted()) {
+      if (VideoEncode.isHasChangeRotation) {
+        VideoEncode.isHasChangeRotation = false;
+        VideoEncode.stopEncode();
+        VideoEncode.initEncode();
       }
-    } catch (Exception ignored) {
-      synchronized (object) {
-        object.notify();
-      }
+      VideoEncode.encodeOut();
     }
   }
 
   private static void executeAudioIn() {
-    try {
-      while (!Thread.interrupted()) AudioEncode.encodeIn();
-    } catch (Exception ignored) {
-      synchronized (object) {
-        object.notify();
+    while (!Thread.currentThread().isInterrupted()) AudioEncode.encodeIn();
+  }
+
+  private static void executeAudioOut() throws IOException, ErrnoException {
+    while (!Thread.currentThread().isInterrupted()) AudioEncode.encodeOut();
+  }
+
+  private static void executeControlIn() throws IOException {
+    while (!Thread.currentThread().isInterrupted()) Controller.handleIn();
+  }
+
+  private static void executeOtherService() throws IOException, InterruptedException {
+    while (!Thread.currentThread().isInterrupted()) {
+      if (SystemClock.elapsedRealtime() - Controller.lastKeepAliveTime > KEEPALIVE_TIMEOUT_MS) {
+        throw new IOException(ServerText.get("keepalive_timeout"));
       }
+      Controller.maintainScreen();
+      Thread.sleep(1_000);
     }
   }
 
-  private static void executeAudioOut() {
-    try {
-      while (!Thread.interrupted()) AudioEncode.encodeOut();
-    } catch (Exception ignored) {
-      synchronized (object) {
-        object.notify();
-      }
-    }
-  }
-
-  private static void executeControlIn() {
-    try {
-      while (!Thread.interrupted()) Controller.handleIn();
-    } catch (Exception ignored) {
-      synchronized (object) {
-        object.notify();
-      }
-    }
-  }
-
-  private static void executeOtherService() {
-    try {
-      while (!Thread.interrupted()) {
-        if (Options.autoControlScreen) Controller.checkScreenOff(true);
-        Device.setScreenPowerMode(Options.turnOffScreen ? 0 : 1);
-        if (System.currentTimeMillis() - Controller.lastKeepAliveTime > 1000 * 5)
-          throw new IOException("连接断开");
-        Thread.sleep(1000);
-      }
-    } catch (Exception ignored) {
-      synchronized (object) {
-        object.notify();
-      }
-    }
+  public static void setDisplayBlanked(boolean blanked) {
+    displayPower.setBlanked(blanked);
   }
 
   public synchronized static void write(ByteBuffer byteBuffer) throws InterruptedIOException, ErrnoException {

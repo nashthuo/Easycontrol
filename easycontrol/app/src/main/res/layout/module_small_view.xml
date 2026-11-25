@@ -4,7 +4,8 @@
   android:layout_width="wrap_content"
   android:layout_height="wrap_content"
   android:background="@drawable/background_cron"
-  android:backgroundTint="@color/cardContainerBackground">
+  android:backgroundTint="@color/cardContainerBackground"
+  android:minWidth="136dp">
 
   <FrameLayout
     android:id="@+id/texture_view_layout"
@@ -61,15 +62,16 @@
     android:layout_width="60dp"
     android:layout_height="15dp"
     android:layout_gravity="center_horizontal|top"
+    android:contentDescription="@string/mirror_controls"
     android:src="@drawable/bar"
     android:tint="@color/clientBar" />
 
   <GridLayout
     android:id="@+id/bar_view"
-    android:layout_width="110dp"
+    android:layout_width="176dp"
     android:layout_height="wrap_content"
     android:layout_gravity="center_horizontal"
-    android:layout_marginTop="20dp"
+    android:layout_marginTop="40dp"
     android:background="@drawable/background_cron"
     android:backgroundTint="@color/cardBackground"
     android:columnCount="3"
@@ -81,6 +83,7 @@
       android:layout_width="20dp"
       android:layout_height="20dp"
       android:layout_columnWeight="1"
+      android:contentDescription="@string/mirror_minimize"
       android:src="@drawable/mini"
       android:tint="@color/onCardBackground" />
 
@@ -89,16 +92,18 @@
       android:layout_width="20dp"
       android:layout_height="20dp"
       android:layout_columnWeight="1"
+      android:contentDescription="@string/mirror_fullscreen"
       android:src="@drawable/fullscreen"
       android:tint="@color/onCardBackground" />
 
     <ImageView
-      android:id="@+id/button_close"
+      android:id="@+id/button_display"
       android:layout_width="20dp"
       android:layout_height="20dp"
       android:layout_columnWeight="1"
-      android:src="@drawable/close"
-      android:tint="@color/buttonSecond" />
+      android:contentDescription="@string/mirror_display"
+      android:src="@drawable/power"
+      android:tint="@color/onCardBackground" />
 
     <Space
       android:layout_height="8dp"
@@ -109,6 +114,7 @@
       android:layout_width="20dp"
       android:layout_height="20dp"
       android:layout_columnWeight="1"
+      android:contentDescription="@string/mirror_recent_apps"
       android:src="@drawable/menu"
       android:tint="@color/onCardBackground" />
 
@@ -117,6 +123,7 @@
       android:layout_width="20dp"
       android:layout_height="20dp"
       android:layout_columnWeight="1"
+      android:contentDescription="@string/mirror_home"
       android:src="@drawable/home"
       android:tint="@color/onCardBackground" />
 
@@ -125,6 +132,7 @@
       android:layout_width="20dp"
       android:layout_height="20dp"
       android:layout_columnWeight="1"
+      android:contentDescription="@string/mirror_back"
       android:src="@drawable/back"
       android:tint="@color/onCardBackground" />
 
@@ -132,13 +140,48 @@
       android:layout_height="8dp"
       android:layout_columnSpan="3" />
 
-    <ImageView
-      android:id="@+id/button_power"
-      android:layout_width="20dp"
-      android:layout_height="20dp"
-      android:layout_columnWeight="1"
-      android:src="@drawable/power"
-      android:tint="@color/onCardBackground" />
+    <include
+      android:id="@+id/key_controls"
+      layout="@layout/mirror_key_buttons"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_columnSpan="3" />
 
   </GridLayout>
+
+  <LinearLayout
+    android:id="@+id/reconnect_status"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:accessibilityLiveRegion="polite"
+    android:background="@drawable/background_cron"
+    android:backgroundTint="@color/cardContainerBackground"
+    android:contentDescription="@string/mirror_reconnect_action"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <TextView
+      android:id="@+id/reconnect_label"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="@string/mirror_reconnecting"
+      android:textColor="@color/onCardContainerBackground"
+      android:textSize="16sp" />
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="4dp"
+      android:text="@string/mirror_cancel_reconnect"
+      android:textColor="@color/onCardContainerBackground"
+      android:textSize="13sp" />
+  </LinearLayout>
+
+  <ImageButton
+    android:id="@+id/button_close"
+    style="@style/MirrorCloseButton"
+    android:layout_gravity="top|end"
+    android:layout_marginTop="2dp"
+    android:layout_marginEnd="2dp" />
 </FrameLayout>
