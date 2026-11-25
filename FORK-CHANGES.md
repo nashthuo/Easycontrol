@@ -30,3 +30,11 @@
 - Decoder input buffer sized for large key frames.
 - Known behaviour: after a Power or Wake press, "turn off phone screen" stays paused for the rest of that session.
 - Startup sends the first frame when SPS, PPS and the IDR arrive in one buffer (Qualcomm OMX); the loop reads the NAL types, not only the flags.
+
+## Wave 2
+
+- Reuse the live ADB transport for the same address and close the mirror streams between attempts.
+- Add a live Sync clipboard setting for both directions. It defaults to on.
+- Prefer hardware AVC decoders in Auto mode, offer a manual choice, and retry codecs without rejected latency hints.
+- Use the display guard to restore the previous size and density, including overrides, when the server ends.
+- Save an optional app package per device and mirror it on a virtual display with touch and key input. Fall back to the whole screen if Android cannot start the app display.

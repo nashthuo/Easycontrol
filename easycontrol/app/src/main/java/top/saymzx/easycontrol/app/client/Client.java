@@ -48,16 +48,20 @@ public class Client {
   private final ClientView clientView;
   private final ItemClientLoadingBinding loading;
   private final Dialog dialog;
-  private final Runnable retry = this::beginPrimary;
+  private final Runnable retry = this::beginRetry;
   private final Runnable giveUp = this::onReconnectExpired;
 
-  // Lifecycle state belongs to the main thread. Each attempt owns its transport and workers.
-  private Attempt attempt;
+  // The client owns the ADB transport. Each attempt owns its shell, forward and workers.
+  private final Object adbLock = new Object();
+  private Adb reusableAdb;
+  private int adbAddressIndex;
+  private volatile Attempt attempt;
   private boolean released;
   private boolean reconnecting;
   private int retryCount;
   private long reconnectDeadline;
   private int primaryFailure;
+  private int retryAddressIndex;
   public Controller controller;
   public volatile boolean isNormalPlay = true;
 
@@ -84,6 +88,13 @@ public class Client {
     beginAttempt(0);
   }
 
+  private void beginRetry() {
+    int addressIndex = retryAddressIndex;
+    retryAddressIndex = 0;
+    primaryFailure = 0;
+    beginAttempt(addressIndex);
+  }
+
   private void beginAttempt(int addressIndex) {
     if (released) return;
     if (reconnecting && SystemClock.elapsedRealtime() >= reconnectDeadline) {
@@ -92,33 +103,72 @@ public class Client {
     }
     if (dialog.isShowing()) loading.text.setText(R.string.loading_text);
     Attempt next = new Attempt(addressIndex);
-    attempt = next;
+    synchronized (adbLock) {
+      if (reusableAdb != null && (adbAddressIndex != addressIndex || reusableAdb.isClosed())) dropAdb();
+      attempt = next;
+    }
     armTimeout(next, 12_000, R.string.connection_timeout);
     next.workers.execute(() -> connect(next));
   }
 
   private void armTimeout(Attempt current, long delay, int error) {
     main.removeCallbacks(current.timeout);
-    current.timeout = () -> onAttemptFailure(current, error, null);
+    current.timeout = () -> onAttemptFailure(current, error, new SocketTimeoutException("Mirror attempt timed out"));
     main.postDelayed(current.timeout, delay);
+  }
+
+  private Adb connectAdb(Attempt current) throws Exception {
+    synchronized (adbLock) {
+      if (attempt != current) throw new InterruptedException();
+      if (reusableAdb != null && !reusableAdb.isClosed()) {
+        Log.i(TAG, "adb reused");
+        return reusableAdb;
+      }
+    }
+
+    Adb adb;
+    if (usbDevice != null) {
+      adb = new Adb(usbDevice);
+    } else {
+      Pair<String, Integer> address = AppData.publicTools.getIpAndPort(addresses[current.addressIndex]);
+      if (address == null) return null;
+      adb = new Adb(address.first, address.second);
+    }
+    synchronized (adbLock) {
+      if (attempt != current) {
+        adb.close();
+        throw new InterruptedException();
+      }
+      reusableAdb = adb;
+      adbAddressIndex = current.addressIndex;
+    }
+    Log.i(TAG, "adb new");
+    try {
+      adb.connect(AppData.keyPair, () -> main.post(() -> awaitingApproval(current)));
+    } catch (Exception error) {
+      adb.close();
+      throw error;
+    }
+    return adb;
+  }
+
+  private void dropAdb() {
+    synchronized (adbLock) {
+      if (reusableAdb != null) {
+        reusableAdb.close();
+        reusableAdb = null;
+      }
+    }
   }
 
   private void connect(Attempt current) {
     int stageError = R.string.connection_failed;
     try {
-      Adb adb;
-      if (usbDevice != null) {
-        adb = new Adb(usbDevice);
-      } else {
-        Pair<String, Integer> address = AppData.publicTools.getIpAndPort(addresses[current.addressIndex]);
-        if (address == null) {
-          main.post(() -> onAttemptFailure(current, R.string.connection_bad_address, null));
-          return;
-        }
-        adb = new Adb(address.first, address.second);
+      Adb adb = connectAdb(current);
+      if (adb == null) {
+        main.post(() -> onAttemptFailure(current, R.string.connection_bad_address, null));
+        return;
       }
-      if (!current.attach(adb)) return;
-      adb.connect(AppData.keyPair, () -> main.post(() -> awaitingApproval(current)));
       main.post(() -> {
         if (!isCurrent(current)) return;
         if (dialog.isShowing()) loading.text.setText(R.string.loading_text);
@@ -128,8 +178,9 @@ public class Client {
       stageError = R.string.connection_server_upload;
       sendServer(adb, current.socketName);
       stageError = R.string.connection_server_start;
-      startServer(adb, current.socketName);
+      if (!current.attach(startServer(adb, current.socketName), true)) return;
       AdbStream stream = connectServer(adb, current.socketName);
+      if (!current.attach(stream, false)) return;
       stageError = R.string.connection_server_data;
       int width = stream.readInt();
       int height = stream.readInt();
@@ -181,15 +232,17 @@ public class Client {
       throw new IOException("Could not install mirror server");
   }
 
-  private void startServer(Adb adb, String socketName) throws IOException, InterruptedException {
+  private AdbStream startServer(Adb adb, String socketName) throws IOException, InterruptedException {
+    String appPackage = device.appPackage;
+    if (!Device.isValidAppPackage(appPackage)) throw new IOException("Invalid app package");
     int width = -1;
     int height = -1;
-    if (device.setResolution) {
+    if (device.setResolution && appPackage.isEmpty()) {
       Pair<Integer, Integer> size = FullActivity.getScreenSizeWithoutDock();
       width = size.first;
       height = size.second;
     }
-    adb.startShell("CLASSPATH=/data/local/tmp/" + AppData.serverName
+    return adb.startShell("CLASSPATH=/data/local/tmp/" + AppData.serverName
       + " exec app_process / top.saymzx.easycontrol.server.Server"
       + " socket_name=" + socketName
       + " is_audio=" + (device.isAudio ? 1 : 0)
@@ -197,7 +250,8 @@ public class Client {
       + " video_bit_rate=" + device.maxVideoBit
       + " turn_off_screen=" + (AppData.setting.getSlaveTurnOffScreen() ? 1 : 0)
       + " auto_control_screen=" + (AppData.setting.getAutoControlScreen() ? 1 : 0)
-      + " set_width=" + width + " set_height=" + height);
+      + " set_width=" + width + " set_height=" + height
+      + (appPackage.isEmpty() ? "" : " app_package=" + appPackage));
   }
 
   private AdbStream connectServer(Adb adb, String socketName) throws IOException, InterruptedException {
@@ -206,7 +260,12 @@ public class Client {
       try {
         return adb.localSocketForward(socketName);
       } catch (IOException failure) {
-        if (adb.isClosed() || SystemClock.elapsedRealtime() >= deadline) throw failure;
+        if (adb.isClosed()) throw failure;
+        if (SystemClock.elapsedRealtime() >= deadline) {
+          SocketTimeoutException timeout = new SocketTimeoutException("Mirror socket did not open");
+          timeout.initCause(failure);
+          throw timeout;
+        }
         Thread.sleep(100);
       }
     }
@@ -215,7 +274,6 @@ public class Client {
   private void onReady(Attempt current, AdbStream stream, Pair<Integer, Integer> size,
                        ByteBuffer csd0, ByteBuffer firstFrame, ByteBuffer audioConfig) {
     if (!isCurrent(current)) return;
-    current.stream = stream;
     current.video = new VideoDecode(size, csd0);
     current.firstFrame = firstFrame;
     if (audioConfig != null) {
@@ -367,6 +425,9 @@ public class Client {
     if (!isCurrent(current)) return;
     if (error != null) Log.w(TAG, "Connection attempt failed", error);
     stopAttempt();
+    if (error instanceof SocketTimeoutException || (error != null && error.getCause() instanceof SocketTimeoutException)) {
+      dropAdb();
+    }
     if (current.addressIndex == 0 && addresses.length > 1) {
       primaryFailure = reason;
       if (reconnecting) {
@@ -397,6 +458,9 @@ public class Client {
     }
     if (error != null) Log.i(TAG, "Mirror link lost", error);
     stopAttempt();
+    synchronized (adbLock) {
+      retryAddressIndex = reusableAdb != null && !reusableAdb.isClosed() ? current.addressIndex : 0;
+    }
     reconnecting = true;
     retryCount = 0;
     reconnectDeadline = SystemClock.elapsedRealtime() + RECONNECT_LIMIT_MS;
@@ -449,6 +513,7 @@ public class Client {
     main.removeCallbacks(giveUp);
     dialog.dismiss();
     stopAttempt();
+    dropAdb();
     clientView.dismiss();
   }
 
@@ -457,7 +522,7 @@ public class Client {
     final String socketName = "easycontrol_" + UUID.randomUUID().toString().replace("-", "");
     final ExecutorService workers = Executors.newFixedThreadPool(4);
     Runnable timeout = () -> {};
-    private Adb adb;
+    private AdbStream shell;
     private boolean stopped;
     AdbStream stream;
     VideoDecode video;
@@ -472,12 +537,13 @@ public class Client {
       this.addressIndex = addressIndex;
     }
 
-    synchronized boolean attach(Adb connection) {
+    synchronized boolean attach(AdbStream connection, boolean serverShell) {
       if (stopped) {
         connection.close();
         return false;
       }
-      adb = connection;
+      if (serverShell) shell = connection;
+      else stream = connection;
       return true;
     }
 
@@ -485,7 +551,8 @@ public class Client {
       synchronized (this) {
         stopped = true;
         workers.shutdownNow();
-        if (adb != null) adb.close();
+        if (stream != null) stream.close();
+        if (shell != null) shell.close();
       }
       if (video != null) video.release();
       if (audio != null) audio.release();

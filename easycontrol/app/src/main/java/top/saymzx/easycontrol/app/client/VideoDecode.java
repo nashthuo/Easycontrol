@@ -4,13 +4,20 @@ import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaFormat;
+import android.os.Build;
+import android.util.Log;
 import android.util.Pair;
 import android.view.Surface;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+
+import top.saymzx.easycontrol.app.entity.AppData;
 
 public class VideoDecode {
+  private static final String TAG = "EasycontrolVideo";
   private static final String MIME = MediaFormat.MIMETYPE_VIDEO_AVC;
   private MediaCodec codec;
   private final ByteBuffer csd0;
@@ -22,40 +29,67 @@ public class VideoDecode {
     this.csd0 = csd0;
   }
 
-  public void setVideoDecodec(Surface surface) throws IOException {
-    String defaultName = null;
-    try {
-      codec = MediaCodec.createDecoderByType(MIME);
-      defaultName = codec.getName();
-      configure(surface);
-      return;
-    } catch (IOException | RuntimeException failure) {
-      release();
-    }
-    MediaFormat format = makeFormat();
+  public static List<String> getAvcDecoderNames() {
+    List<String> hardware = new ArrayList<>();
+    List<String> software = new ArrayList<>();
     for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
-      if (info.isEncoder() || info.getName().equals(defaultName)) continue;
+      if (info.isEncoder()) continue;
+      for (String type : info.getSupportedTypes()) {
+        if (!MIME.equalsIgnoreCase(type)) continue;
+        (isHardwareDecoder(info) ? hardware : software).add(info.getName());
+        break;
+      }
+    }
+    hardware.addAll(software);
+    return hardware;
+  }
+
+  private static boolean isHardwareDecoder(MediaCodecInfo info) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return info.isHardwareAccelerated();
+    String name = info.getName();
+    return !name.startsWith("OMX.google.") && !name.startsWith("c2.android.") && !name.contains(".sw.");
+  }
+
+  public void setVideoDecodec(Surface surface) throws IOException {
+    List<String> names = getAvcDecoderNames();
+    String preferred = AppData.setting.getVideoDecoder();
+    if (names.remove(preferred)) names.add(0, preferred);
+    Exception lastFailure = null;
+    for (String name : names) {
       try {
-        if (!info.getCapabilitiesForType(MIME).isFormatSupported(format)) continue;
-        codec = MediaCodec.createByCodecName(info.getName());
-        configure(surface);
+        codec = MediaCodec.createByCodecName(name);
+        try {
+          codec.configure(makeFormat(true), surface, null, 0);
+        } catch (RuntimeException hintsRejected) {
+          release();
+          codec = MediaCodec.createByCodecName(name);
+          codec.configure(makeFormat(false), surface, null, 0);
+        }
+        codec.start();
+        Log.i(TAG, "Video decoder: " + name);
         return;
       } catch (IOException | RuntimeException failure) {
+        lastFailure = failure;
         release();
       }
     }
-    throw new IOException("No usable H.264 decoder");
+    throw new IOException("No usable H.264 decoder", lastFailure);
   }
 
-  private MediaFormat makeFormat() {
+  private MediaFormat makeFormat(boolean lowLatency) {
     MediaFormat f = MediaFormat.createVideoFormat(MIME, videoSize.first, videoSize.second);
     f.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, Math.max(2 << 20, videoSize.first * videoSize.second));
+    if (lowLatency) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) f.setInteger(MediaFormat.KEY_LOW_LATENCY, 1);
+      f.setInteger("vendor.qti-ext-dec-low-latency.enable", 1);
+      f.setInteger("vendor.rtc-ext-dec-low-latency.enable", 1);
+      f.setInteger("vdec-lowlatency", 1);
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        f.setInteger(MediaFormat.KEY_PRIORITY, 0);
+        f.setInteger(MediaFormat.KEY_OPERATING_RATE, Short.MAX_VALUE);
+      }
+    }
     return f;
-  }
-
-  private void configure(Surface surface) {
-    codec.configure(makeFormat(), surface, null, 0);
-    codec.start();
   }
 
   public void queueConfig() throws InterruptedException {
@@ -100,5 +134,6 @@ public class VideoDecode {
       codec.release();
     } catch (RuntimeException ignored) {
     }
+    codec = null;
   }
 }

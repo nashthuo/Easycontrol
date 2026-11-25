@@ -46,4 +46,10 @@
   <string name="loading_text">Loading\nTap to cancel</string>
   <string name="toast_fullscreen_back">Exit fullscreen to go back on the tablet</string>
   <string name="toast_fullscreen_busy">A device is already open in fullscreen</string>
+  <string name="setting_sync_clipboard">Sync clipboard</string>
+  <string name="setting_video_decoder">Video decoder</string>
+  <string name="setting_video_decoder_auto">Auto (lowest lag)</string>
+  <string name="device_app_package">App to mirror (package name)</string>
+  <string name="device_app_package_hint">Leave empty to mirror the whole screen</string>
+  <string name="device_app_package_invalid">Enter a package name with up to 200 letters, digits, dots, or underscores.</string>
 </resources>

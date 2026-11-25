@@ -96,6 +96,22 @@ public final class Setting {
     editor.apply();
   }
 
+  public boolean getSyncClipboard() {
+    return sharedPreferences.getBoolean("syncClipboard", true);
+  }
+
+  public void setSyncClipboard(boolean value) {
+    sharedPreferences.edit().putBoolean("syncClipboard", value).apply();
+  }
+
+  public String getVideoDecoder() {
+    return sharedPreferences.getString("videoDecoder", "");
+  }
+
+  public void setVideoDecoder(String name) {
+    sharedPreferences.edit().putString("videoDecoder", name).apply();
+  }
+
   public Setting(SharedPreferences sharedPreferences) {
     this.sharedPreferences = sharedPreferences;
     this.editor = sharedPreferences.edit();
