@@ -12,7 +12,6 @@ import android.view.InputEvent;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
@@ -34,49 +33,24 @@ public final class Device {
   public static int displayId = 0;
   public static int layerStack;
 
-  public static void init() throws IOException, InterruptedException {
+  public static void init() {
     DisplayInfo displayInfo = DisplayManager.getDisplayInfo(displayId);
     deviceSize = displayInfo.size;
     deviceRotation = displayInfo.rotation;
-    // Change the resolution.
-    if (Options.setWidth != -1) calculateSize();
     // Compute the video size.
     computeVideoSize();
     layerStack = displayInfo.layerStack;
   }
 
   public static void startListeners() {
-    // Watch for rotation.
-    setRotationListener();
+    if (displayId == 0) setRotationListener();
     // Watch for clipboard changes.
     setClipBoardListener();
   }
 
-  // Fit the resolution to the client aspect ratio.
-  private static void calculateSize() throws IOException, InterruptedException {
-    // Use the original resolution before rotation.
-    if (deviceRotation == 1 || deviceRotation == 3)
-      deviceSize = new Pair<>(deviceSize.second, deviceSize.first);
-    // Match the display orientation.
-    if (deviceSize.first < deviceSize.second ^ Options.setWidth < Options.setHeight) {
-      int tmp = Options.setWidth;
-      Options.setWidth = Options.setHeight;
-      Options.setHeight = tmp;
-    }
-    Pair<Integer, Integer> newScreenSize;
-    int tmp1 = Options.setHeight * Device.deviceSize.first / Options.setWidth;
-    // Keep the width within the display width.
-    if (Device.deviceSize.second > tmp1) newScreenSize = new Pair<>(Device.deviceSize.first, tmp1);
-      // Keep the height within the display height.
-    else
-      newScreenSize = new Pair<>(Options.setWidth * Device.deviceSize.second / Options.setHeight, Device.deviceSize.second);
-    // Change the resolution.
-    Process process = new ProcessBuilder().command("sh", "-c", "wm size " + newScreenSize.first + "x" + newScreenSize.second).start();
-    // Read the new resolution.
-    Options.resolutionChanged = process.waitFor() == 0;
-    DisplayInfo displayInfo = DisplayManager.getDisplayInfo(displayId);
-    deviceSize = displayInfo.size;
-    deviceRotation = displayInfo.rotation;
+  public static void useAppDisplay(int id) {
+    displayId = id;
+    deviceSize = videoSize;
   }
 
   private static void computeVideoSize() {
@@ -173,6 +147,8 @@ public final class Device {
   }
 
   public static void keyEvent(int keyCode) {
+    // Android handles these keys globally even when the event names a display.
+    if (displayId != 0 && (keyCode == KeyEvent.KEYCODE_POWER || keyCode == KeyEvent.KEYCODE_WAKEUP)) return;
     long now = SystemClock.uptimeMillis();
     KeyEvent event1 = new KeyEvent(now, now, MotionEvent.ACTION_DOWN, keyCode, 0, 0, -1, 0, 0, InputDevice.SOURCE_KEYBOARD);
     KeyEvent event2 = new KeyEvent(now, now, MotionEvent.ACTION_UP, keyCode, 0, 0, -1, 0, 0, InputDevice.SOURCE_KEYBOARD);
@@ -182,6 +158,7 @@ public final class Device {
 
   private static void injectEvent(InputEvent inputEvent) {
     try {
+      if (displayId != 0) InputManager.setDisplayId(inputEvent, displayId);
       InputManager.injectInputEvent(inputEvent, InputManager.INJECT_INPUT_EVENT_MODE_ASYNC);
     } catch (Exception ignored) {
     }

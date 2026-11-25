@@ -13,9 +13,9 @@ public final class Options {
   public static boolean turnOffScreen;
   public static boolean autoControlScreen;
   public static int setWidth = -1;
-  public static boolean resolutionChanged;
   public static String socketName = "easycontrol";
   public static int setHeight = -1;
+  public static String appPackage = "";
 
   public static void parse(String... args) {
     for (String arg : args) {
@@ -55,6 +55,11 @@ public final class Options {
           break;
         case "set_height":
           setHeight = Integer.parseInt(value);
+          break;
+        case "app_package":
+          if (!value.matches("[A-Za-z0-9._]{1,200}"))
+            throw new IllegalArgumentException(ServerText.get("invalid_arg"));
+          appPackage = value;
           break;
       }
     }

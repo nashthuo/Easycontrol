@@ -35,11 +35,16 @@ public final class Command {
   }
 
   public static String execReadOutput(String... cmd) throws IOException, InterruptedException {
-    Process process = Runtime.getRuntime().exec(cmd);
+    return execReadOutput(false, cmd);
+  }
+
+  static String execReadOutput(boolean includeErrors, String... cmd) throws IOException, InterruptedException {
+    Process process = new ProcessBuilder(cmd).redirectErrorStream(includeErrors).start();
     StringBuilder builder = new StringBuilder();
-    Scanner scanner = new Scanner(process.getInputStream());
-    while (scanner.hasNextLine()) {
-      builder.append(scanner.nextLine()).append('\n');
+    try (Scanner scanner = new Scanner(process.getInputStream())) {
+      while (scanner.hasNextLine()) {
+        builder.append(scanner.nextLine()).append('\n');
+      }
     }
     int exitCode = process.waitFor();
     if (exitCode != 0) {

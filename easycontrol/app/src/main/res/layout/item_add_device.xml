@@ -102,6 +102,26 @@
     android:paddingEnd="10dp"
     android:visibility="gone" />
 
+  <TextView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:labelFor="@id/app_package"
+    android:text="@string/device_app_package"
+    android:textColor="@color/onCardBackground"
+    android:textSize="@dimen/largeFont" />
+
+  <EditText
+    android:id="@+id/app_package"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="4dp"
+    android:hint="@string/device_app_package_hint"
+    android:inputType="textUri"
+    android:textColor="@color/onCardBackground"
+    android:textColorHint="@color/onCardBackgroundSecond"
+    android:textSize="@dimen/middleFont" />
+
   <Button
     android:id="@+id/ok"
     android:layout_width="match_parent"

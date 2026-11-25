@@ -69,11 +69,14 @@ public final class Server {
       Options.parse(args);
       setManagers();
       connectClient();
+      boolean manageMainDisplay = Options.appPackage.isEmpty();
+      if (manageMainDisplay && (Options.turnOffScreen || (Options.setWidth > 0 && Options.setHeight > 0))) {
+        displayPower.startGuard(Options.turnOffScreen, Options.setWidth, Options.setHeight);
+      }
       Device.init();
-      Controller.wakeForCapture();
+      if (manageMainDisplay) Controller.wakeForCapture();
       VideoEncode.init();
       boolean canAudio = AudioEncode.init();
-      if (Options.turnOffScreen) displayPower.startGuard();
       Device.startListeners();
       Controller.lastKeepAliveTime = SystemClock.elapsedRealtime();
       workers.add(new Thread(() -> runWorker(Server::executeVideoOut), "easycontrol-video"));
@@ -128,7 +131,7 @@ public final class Server {
       }
     }
 
-    // Restore display power before waiting on any codec or input worker.
+    // Restore the physical display before waiting on any codec or input worker.
     displayPower.restore();
     Rotation.restore();
 
@@ -141,13 +144,7 @@ public final class Server {
       }
       allStopped &= !worker.isAlive();
     }
-    if (Options.resolutionChanged) {
-      try {
-        new ProcessBuilder("wm", "size", "reset").start().waitFor();
-      } catch (IOException | InterruptedException error) {
-        Log.w(LOG_TAG, ServerText.get("resolution_failed"), error);
-      }
-    }
+    VideoEncode.releaseAppDisplay();
     if (allStopped) {
       VideoEncode.release();
       AudioEncode.release();
@@ -174,7 +171,7 @@ public final class Server {
     // 4
     ClipboardManager.init(getService("clipboard", "android.content.IClipboard"));
     // 5
-    SurfaceControl.init();
+    if (Options.appPackage.isEmpty()) SurfaceControl.init();
   }
 
   private static IInterface getService(String service, String type) {
@@ -223,7 +220,7 @@ public final class Server {
       if (SystemClock.elapsedRealtime() - Controller.lastKeepAliveTime > KEEPALIVE_TIMEOUT_MS) {
         throw new IOException(ServerText.get("keepalive_timeout"));
       }
-      Controller.maintainScreen();
+      if (Options.appPackage.isEmpty()) Controller.maintainScreen();
       Thread.sleep(1_000);
     }
   }

@@ -4,6 +4,7 @@
 package top.saymzx.easycontrol.server.helper;
 
 import android.graphics.Rect;
+import android.hardware.display.VirtualDisplay;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
@@ -30,27 +31,32 @@ public final class VideoEncode {
   public static volatile boolean isHasChangeRotation;
 
   public static IBinder display;
+  private static VirtualDisplay appDisplay;
   private static boolean tryCbr = true;
 
-  public static void init() throws InvocationTargetException, NoSuchMethodException, IllegalAccessException, IOException, ErrnoException {
-    // Create the virtual display.
-    display = SurfaceControl.createDisplay("easycontrol", Build.VERSION.SDK_INT < Build.VERSION_CODES.R || (Build.VERSION.SDK_INT == Build.VERSION_CODES.R && !"S".equals(Build.VERSION.CODENAME)));
+  public static void init() throws ReflectiveOperationException, IOException, ErrnoException, InterruptedException {
+    try {
+      startEncoder();
+    } catch (IOException | RuntimeException failure) {
+      releaseCodec();
+      tryCbr = false;
+      startEncoder();
+    }
+    if (!Options.appPackage.isEmpty()) appDisplay = AppDisplay.start(surface);
+    if (appDisplay == null) {
+      if (!Options.appPackage.isEmpty()) SurfaceControl.init();
+      display = SurfaceControl.createDisplay("easycontrol", Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+        || (Build.VERSION.SDK_INT == Build.VERSION_CODES.R && !"S".equals(Build.VERSION.CODENAME)));
+      setDisplaySurface(display, surface);
+    } else {
+      Device.useAppDisplay(appDisplay.getDisplay().getDisplayId());
+    }
     // Send the video dimensions.
     ByteBuffer byteBuffer = ByteBuffer.allocate(8);
     byteBuffer.putInt(Device.videoSize.first);
     byteBuffer.putInt(Device.videoSize.second);
     byteBuffer.flip();
     Server.write(byteBuffer);
-    // Create the codec.
-    try {
-      setVideoEncodec();
-      initEncode();
-    } catch (Exception ignored) {
-      releaseCodec();
-      tryCbr = false;
-      setVideoEncodec();
-      initEncode();
-    }
     writeStartupFrames();
   }
 
@@ -88,16 +94,25 @@ public final class VideoEncode {
   // Initialize the encoder.
   private static Surface surface;
 
+  private static void startEncoder() throws IOException {
+    setVideoEncodec();
+    configureEncoder();
+    encedec.start();
+  }
+
   public static void initEncode() throws InvocationTargetException, NoSuchMethodException, IllegalAccessException {
+    configureEncoder();
+    setDisplaySurface(display, surface);
+    encedec.start();
+  }
+
+  private static void configureEncoder() {
     // Set the video dimensions.
     encodecFormat.setInteger(MediaFormat.KEY_WIDTH, Device.videoSize.first);
     encodecFormat.setInteger(MediaFormat.KEY_HEIGHT, Device.videoSize.second);
     encedec.configure(encodecFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
     // Attach the display to the input surface.
     surface = encedec.createInputSurface();
-    setDisplaySurface(display, surface);
-    // Start the encoder.
-    encedec.start();
   }
 
   public static void stopEncode() {
@@ -222,5 +237,11 @@ public final class VideoEncode {
       }
       display = null;
     }
+  }
+
+  public static void releaseAppDisplay() {
+    if (appDisplay == null) return;
+    AppDisplay.release(appDisplay);
+    appDisplay = null;
   }
 }

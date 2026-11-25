@@ -82,6 +82,7 @@ public class PublicTools {
     itemAddDeviceBinding.address.setText(device.address);
     itemAddDeviceBinding.fallbackAddress.setText(device.fallbackAddress);
     itemAddDeviceBinding.isAudio.setChecked(device.isAudio);
+    itemAddDeviceBinding.appPackage.setText(device.appPackage);
     ArrayAdapter<String> maxSizeAdapter = new ArrayAdapter<>(context, R.layout.item_spinner_item, maxSizeList);
     ArrayAdapter<String> maxFpsAdapter = new ArrayAdapter<>(context, R.layout.item_spinner_item, maxFpsList);
     ArrayAdapter<String> videoBitAdapter = new ArrayAdapter<>(context, R.layout.item_spinner_item, videoBitList);
@@ -105,6 +106,11 @@ public class PublicTools {
         itemAddDeviceBinding.fallbackAddress.setError(context.getString(R.string.connection_bad_address));
         return;
       }
+      String appPackage = itemAddDeviceBinding.appPackage.getText().toString().trim();
+      if (!Device.isValidAppPackage(appPackage)) {
+        itemAddDeviceBinding.appPackage.setError(context.getString(R.string.device_app_package_invalid));
+        return;
+      }
       Device newDevice = new Device(
         device.id,
         itemAddDeviceBinding.name.getText().toString(),
@@ -116,6 +122,7 @@ public class PublicTools {
         Integer.parseInt(maxVideoBit.itemSpinnerSpinner.getSelectedItem().toString()),
         setResolution.itemSwitchSwitch.isChecked()
       );
+      newDevice.appPackage = appPackage;
       if (newDevice.id != null) AppData.dbHelper.update(newDevice);
       else AppData.dbHelper.insert(newDevice);
       deviceListAdapter.update();

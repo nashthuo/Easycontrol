@@ -7,10 +7,18 @@ import android.os.IInterface;
 import android.view.IRotationWatcher;
 
 public final class WindowManager {
+  private static final int REMOVE_CONTENT_MODE_DESTROY = 2;
   private static IInterface manager;
 
   public static void init(IInterface m) throws NoSuchMethodException {
     manager = m;
+  }
+
+  public static void destroyContentOnRemoval(int displayId) throws ReflectiveOperationException {
+    // Android 10's window manager requires this in addition to the virtual display flag.
+    Class.forName("android.view.IWindowManager")
+      .getMethod("setRemoveContentMode", int.class, int.class)
+      .invoke(manager, displayId, REMOVE_CONTENT_MODE_DESTROY);
   }
 
   public static void registerRotationWatcher(IRotationWatcher rotationWatcher, int displayId) {
