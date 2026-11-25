@@ -33,6 +33,9 @@
 
 ## Wave 2
 
+- Docked the mirror control bar on the side with free space (right in landscape, bottom in portrait). It never hides. Added Fit to screen and Rotate phone (control message 6; the server restores the phone rotation settings on exit).
+- Saved the floating window position and size per tablet orientation.
+- LAN scan reads the subnet from the Wi-Fi network (not the Tailscale VPN), probes with normal routing, and skips the tablet itself.
 - Reuse the live ADB transport for the same address and close the mirror streams between attempts.
 - Add a live Sync clipboard setting for both directions. It defaults to on.
 - Prefer hardware AVC decoders in Auto mode, offer a manual choice, and retry codecs without rejected latency hints.

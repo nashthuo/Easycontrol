@@ -55,4 +55,5 @@ In Tasker, add **Send Intent** and set these fields. [Tasker intent guide](https
 
 - Names match without regard to case. Use `device_id` if more than one saved device has the same name.
 - Without a device extra, OPEN and KEY use the default device. CLOSE closes all open mirrors.
+- If the app was force-stopped, Android does not deliver broadcasts to it until it starts again. From adb, add `-f 0x20` (include stopped packages). Normal app close does not cause this.
 - Send KEY after the mirror connects. The key names are `home`, `back`, `recents`, `volume_up`, `volume_down`, and `wake`. The receiver ignores `power` and key code `26`.

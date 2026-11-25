@@ -102,13 +102,44 @@ A free, always-English, more reliable build of Easycontrol V1.0.11, for one use:
 Known bug (moves to Wave 2): a long-press on the device row sometimes opens the menu AND starts a mirror
 behind it. Fix: in `DeviceListAdapter`, ignore the click that follows a handled long-press.
 
-## Wave 2 — tasks (spec detail added when Wave 1 lands)
+## Wave 2 — tasks (Nash 2026-11-25: docked bar first)
 
-ADB reuse (one adb link kept for a reconnect) · Tasker broadcast commands (open, close, key, by an
-explicit intent with a permission) · remember window size and position per orientation · clipboard sync
-with an on/off switch · send a file to the phone Download folder · decoder auto-pick for lowest lag ·
-single-app mirroring · resolution on connect, restored after · LAN scan for wireless adb devices ·
-fix the long-press stray mirror (above).
+Docked control bar (always visible: right in landscape, bottom in portrait; Home, Back, Recents, Volume,
+Power, Wake, Rotate, Fit to screen, Full screen, Minimise, Close) · ADB reuse (one adb link kept for a
+reconnect) · Tasker broadcast commands (open, close, key) · remember window size and position per
+orientation · clipboard sync with an on/off switch · send a file to the phone Download folder · decoder
+auto-pick for lowest lag · single-app mirroring · resolution on connect, restored after · LAN scan for
+wireless adb devices · fix the long-press stray mirror.
+
+Decided for you (Wave 2, small and reversible):
+- Tasker cannot hold a custom permission, so the command gate is the switch "Allow automation commands
+  (Tasker)" (default off). Claude turned it ON on the tablet for the tests and left it on. Undo: turn it off.
+- Rotate sets the phone `user_rotation` and turns auto-rotate off while mirroring; the server puts both
+  back when the session ends. A SIGKILL of the server skips that restore (auto-rotate stays off). Undo: tap
+  Rotate again, or turn auto-rotate on.
+- CI also builds `claude/**` and `codex/**` branches (no release, artifact only). Undo: remove the patterns.
+
+## Wave 2 — results on the Lenovo Tab M10 + Redmi Note 8 (2026-11-25, build 259baf7)
+
+| Check | Result |
+|---|---|
+| Docked bar: bottom in portrait, right in landscape, never hides | PASS |
+| Fit to screen (portrait and landscape, inside status and nav bars) | PASS (after 2 fixes) |
+| Rotate phone (user_rotation 0 -> 1 -> 0; settings restored on Close) | PASS |
+| Window memory per orientation (box restored after app restart and after tablet rotation) | PASS |
+| Long-press on the Redmi row: menu only, no stray mirror | PASS 0/5 stray |
+| ADB reuse (server killed: `adb reused`, mirror back in about 1.5 s) | PASS |
+| Tasker KEY (volume 11 -> 12 -> 11 by name and keycode), Power refused | PASS |
+| Tasker CLOSE, warm OPEN, cold OPEN (app force-stopped; needs `-f 0x20` from adb) | PASS |
+| Send file (name with spaces) to /sdcard/Download | PASS |
+| LAN scan finds 192.168.100.31:5555 with Tailscale active; tap fills the address | PASS (after 2 fixes) |
+| Decoder auto-pick (Auto = `OMX.qcom.video.decoder.avc`, hardware) | PASS (lag not measured) |
+| Single-app mirroring (`com.miui.calculator` on a virtual display; touch 7+2=9; Deezer stays on the main screen; display released on Close) | PASS |
+| Resolution on connect (1080x1687) restored on Close, server SIGKILL, app force-stop | PASS |
+| Sync clipboard switch | PARTIAL: switch shows and is read live; the copy path is not device-tested (no shell clipboard tool on Android 10/11) |
+| Regression: 10 open/close cycles (0 leftover processes, phone screen ON) | PASS 10/10 |
+| Regression: tablet Wi-Fi off 20 s, auto-reconnect | PASS (back 15 s after Wi-Fi on) |
+| Regression: Tailscale fallback with a dead primary address | PASS (link in about 2 s) |
 
 ## Operating rule
 
