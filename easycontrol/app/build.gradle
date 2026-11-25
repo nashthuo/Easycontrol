@@ -10,7 +10,7 @@ android {
         applicationId "io.github.nashthuo.easycontrol"
         minSdk 23
         targetSdk 33
-        versionCode 10012
+        versionCode 10012 + (System.getenv("GITHUB_RUN_NUMBER") ?: "0").toInteger()
         versionName "1.0.12-en"
         resConfigs "en", "zh", "xhdpi"
         ndk {

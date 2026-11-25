@@ -30,6 +30,7 @@ public final class DisplayPower {
       }
     } catch (IOException error) {
       Log.w(LOG_TAG, ServerText.get("display_guard_failed"), error);
+      if (guard != null) guard.destroy();
       restore();
     }
   }

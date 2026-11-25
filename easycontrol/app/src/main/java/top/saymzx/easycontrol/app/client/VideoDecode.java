@@ -48,7 +48,9 @@ public class VideoDecode {
   }
 
   private MediaFormat makeFormat() {
-    return MediaFormat.createVideoFormat(MIME, videoSize.first, videoSize.second);
+    MediaFormat f = MediaFormat.createVideoFormat(MIME, videoSize.first, videoSize.second);
+    f.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, Math.max(2 << 20, videoSize.first * videoSize.second));
+    return f;
   }
 
   private void configure(Surface surface) {

@@ -91,6 +91,11 @@ explicit intent with a permission) · remember window size and position per orie
 with an on/off switch · send a file to the phone Download folder · decoder auto-pick for lowest lag ·
 single-app mirroring · resolution on connect, restored after · LAN scan for wireless adb devices.
 
+## Operating rule
+
+Never run the stock app and Easycontrol EN against the Redmi at the same time. The stock app kills every
+process named "easycontrol" on the phone; the fork's display guard runs as `ec_display_guard` to survive it.
+
 ## Out of scope
 
 Activation or payment code. Play Store release. iOS. Any change to the Redmi other than what the server

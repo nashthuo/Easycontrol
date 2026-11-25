@@ -27,7 +27,7 @@ public class AdbStream implements AutoCloseable {
   }
 
   synchronized void awaitOpen() throws IOException, InterruptedException {
-    long deadline = System.nanoTime() + 1_000_000_000L;
+    long deadline = System.nanoTime() + 10_000_000_000L;
     while (remoteId == 0 && !closed) {
       long remainingMs = (deadline - System.nanoTime()) / 1_000_000L;
       if (remainingMs <= 0) throw new SocketTimeoutException("ADB did not open the stream");

@@ -424,8 +424,7 @@ public class Client {
       onAttemptFailure(current, R.string.connection_decoder_failed, error);
     } else {
       Log.w(TAG, "Video decoder failed", error);
-      showFailure(AppData.main.getString(R.string.connection_decoder_failed));
-      release();
+      onLinkLost(current, error);
     }
   }
 
