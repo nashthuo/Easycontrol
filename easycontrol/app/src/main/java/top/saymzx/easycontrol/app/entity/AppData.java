@@ -32,15 +32,18 @@ public class AppData {
 
   public static String serverName = "easycontrol_server_" + BuildConfig.VERSION_CODE + ".jar";
 
-  public static void init(Activity m) {
-    main = m;
-    dbHelper = new DbHelper(main);
-    clipBoard = (ClipboardManager) main.getSystemService(Context.CLIPBOARD_SERVICE);
-    usbManager = (UsbManager) main.getSystemService(Context.USB_SERVICE);
-    setting = new Setting(main.getSharedPreferences("setting", Context.MODE_PRIVATE));
+  public static void init(Context context) {
+    Context app = context.getApplicationContext();
+    if (setting == null) {
+      dbHelper = new DbHelper(app);
+      clipBoard = (ClipboardManager) app.getSystemService(Context.CLIPBOARD_SERVICE);
+      usbManager = (UsbManager) app.getSystemService(Context.USB_SERVICE);
+      setting = new Setting(app);
+    }
+    if (keyPair != null) return;
     try {
-      File privateKey = new File(main.getApplicationContext().getFilesDir(), "private.key");
-      File publicKey = new File(main.getApplicationContext().getFilesDir(), "public.key");
+      File privateKey = new File(app.getFilesDir(), "private.key");
+      File publicKey = new File(app.getFilesDir(), "public.key");
       if (!privateKey.isFile() || !publicKey.isFile()) {
         AdbKeyPair.generate(privateKey, publicKey);
       }

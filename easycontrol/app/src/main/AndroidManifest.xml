@@ -31,10 +31,29 @@
       android:name=".SetActivity"
       android:exported="false" />
     <activity
+      android:name=".ShareActivity"
+      android:exported="true"
+      android:label="@string/share_activity_label">
+      <intent-filter>
+        <action android:name="android.intent.action.SEND" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="*/*" />
+      </intent-filter>
+    </activity>
+    <activity
       android:name=".client.view.FullActivity"
       android:exported="false"
       android:launchMode="singleTask"
       android:screenOrientation="portrait" />
+    <receiver
+      android:name=".CommandReceiver"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="io.github.nashthuo.easycontrol.action.OPEN" />
+        <action android:name="io.github.nashthuo.easycontrol.action.CLOSE" />
+        <action android:name="io.github.nashthuo.easycontrol.action.KEY" />
+      </intent-filter>
+    </receiver>
   </application>
 
 </manifest>

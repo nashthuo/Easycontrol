@@ -63,7 +63,7 @@
     android:layout_height="wrap_content"
     android:layout_marginStart="25dp"
     android:layout_marginEnd="25dp"
-    android:layout_marginBottom="25dp"
+    android:layout_marginBottom="12dp"
     android:orientation="horizontal">
 
     <Button
@@ -97,5 +97,20 @@
       android:textColor="@color/onButtonSecond"
       android:textSize="@dimen/middleFont" />
   </LinearLayout>
+
+  <Button
+    android:id="@+id/send_file"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="25dp"
+    android:layout_marginEnd="25dp"
+    android:layout_marginBottom="25dp"
+    android:background="@drawable/background_cron"
+    android:backgroundTint="@color/buttonSecond"
+    android:gravity="center"
+    android:padding="8dp"
+    android:text="@string/set_device_send_file"
+    android:textColor="@color/onButtonSecond"
+    android:textSize="@dimen/middleFont" />
 
 </LinearLayout>

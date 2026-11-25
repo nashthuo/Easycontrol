@@ -38,3 +38,7 @@
 - Prefer hardware AVC decoders in Auto mode, offer a manual choice, and retry codecs without rejected latency hints.
 - Use the display guard to restore the previous size and density, including overrides, when the server ends.
 - Save an optional app package per device and mirror it on a virtual display with touch and key input. Fall back to the whole screen if Android cannot start the app display.
+- Prevented device-row long-presses from opening a mirror and ignored repeat opens for the same device within one second.
+- Added opt-in Tasker broadcasts to open or close mirrors and send keys, with Power blocked.
+- Added a Wi-Fi subnet scan for port 5555 in the add and edit device dialog.
+- Added file transfer to the phone's Download folder from the device menu and Android share sheet, with a 512 MB limit.

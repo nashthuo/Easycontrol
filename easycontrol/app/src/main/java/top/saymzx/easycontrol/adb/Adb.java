@@ -92,18 +92,19 @@ public class Adb implements AutoCloseable {
 
   public void pushFile(InputStream file, String remotePath) throws InterruptedException, IOException {
     try (AdbStream stream = open("sync:", true)) {
-      byte[] path = (remotePath + ",33206").getBytes(StandardCharsets.UTF_8);
+      // ADB sync takes a raw path and a decimal mode for a regular 0644 file.
+      byte[] path = (remotePath + "," + 0100644).getBytes(StandardCharsets.UTF_8);
       ByteBuffer start = ByteBuffer.allocate(8 + path.length);
       start.put(AdbProtocol.generatePushPacket("SEND", path.length)).put(path);
       start.flip();
       stream.write(start);
-      byte[] chunk = new byte[4096 - 8];
+      byte[] chunk = new byte[Math.max(4096, maxPayload) - 8];
       int count;
       while ((count = file.read(chunk)) != -1) {
         ByteBuffer data = ByteBuffer.allocate(8 + count);
         data.put(AdbProtocol.generatePushPacket("DATA", count)).put(chunk, 0, count);
         data.flip();
-        stream.write(data);
+        stream.writeAndWaitForAck(data);
       }
       stream.write(AdbProtocol.generatePushPacket("DONE", (int) (System.currentTimeMillis() / 1000)));
       ByteBuffer response = stream.readByteArray(8).order(ByteOrder.LITTLE_ENDIAN);
