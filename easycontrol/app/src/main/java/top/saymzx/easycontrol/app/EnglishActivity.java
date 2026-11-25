@@ -12,7 +12,7 @@ public abstract class EnglishActivity extends Activity {
     super.attachBaseContext(englishContext(base));
   }
 
-  protected static Context englishContext(Context context) {
+  public static Context englishContext(Context context) {
     Configuration override = new Configuration();
     override.setLocale(Locale.US);
     return context.createConfigurationContext(override);

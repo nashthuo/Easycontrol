@@ -29,3 +29,31 @@ adb tcpip 5555
 5. 最小化模式使用
 	- 可上下拖动
 	- 单机返回小窗模式
+
+## Automation (Tasker)
+
+In Easycontrol EN, open Settings and enable **Allow automation commands (Tasker)** under **Other**. The switch is off by default. When it is on, any app on the tablet can send these commands to the receiver. Grant overlay permission in Easycontrol EN before you use OPEN from the background.
+
+Run these commands against the tablet. Replace `Redmi` with your saved device name.
+
+```sh
+adb shell am broadcast -n io.github.nashthuo.easycontrol/top.saymzx.easycontrol.app.CommandReceiver -a io.github.nashthuo.easycontrol.action.OPEN --es device Redmi
+adb shell am broadcast -n io.github.nashthuo.easycontrol/top.saymzx.easycontrol.app.CommandReceiver -a io.github.nashthuo.easycontrol.action.KEY --es device Redmi --es key home
+adb shell am broadcast -n io.github.nashthuo.easycontrol/top.saymzx.easycontrol.app.CommandReceiver -a io.github.nashthuo.easycontrol.action.CLOSE --es device Redmi
+```
+
+In Tasker, add **Send Intent** and set these fields. [Tasker intent guide](https://tasker.joaoapps.com/userguide/en/intents.html)
+
+| Field | Value |
+| --- | --- |
+| Action | `io.github.nashthuo.easycontrol.action.OPEN`, `io.github.nashthuo.easycontrol.action.KEY`, or `io.github.nashthuo.easycontrol.action.CLOSE` |
+| Package | `io.github.nashthuo.easycontrol` |
+| Class | `top.saymzx.easycontrol.app.CommandReceiver` |
+| Target | **Broadcast Receiver** |
+| Extra | `device:Redmi`, or `device_id:1` with the saved device ID |
+| Extra (KEY only) | `key:home`, or `keycode:3` with the Android key code |
+
+- Names match without regard to case. Use `device_id` if more than one saved device has the same name.
+- Without a device extra, OPEN and KEY use the default device. CLOSE closes all open mirrors.
+- If the app was force-stopped, Android does not deliver broadcasts to it until it starts again. From adb, add `-f 0x20` (include stopped packages). Normal app close does not cause this.
+- Send KEY after the mirror connects. The key names are `home`, `back`, `recents`, `volume_up`, `volume_down`, and `wake`. The receiver ignores `power` and key code `26`.

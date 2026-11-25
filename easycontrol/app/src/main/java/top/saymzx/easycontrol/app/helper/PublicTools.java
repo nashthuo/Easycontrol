@@ -5,6 +5,8 @@ import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.util.Pair;
 import android.view.LayoutInflater;
@@ -14,6 +16,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ScrollView;
 
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -80,8 +83,10 @@ public class PublicTools {
     Dialog dialog = createDialog(context, true, itemAddDeviceBinding.getRoot());
     itemAddDeviceBinding.name.setText(device.name);
     itemAddDeviceBinding.address.setText(device.address);
+    itemAddDeviceBinding.scanNetwork.setOnClickListener(v -> scanNetwork(context, dialog, itemAddDeviceBinding));
     itemAddDeviceBinding.fallbackAddress.setText(device.fallbackAddress);
     itemAddDeviceBinding.isAudio.setChecked(device.isAudio);
+    itemAddDeviceBinding.appPackage.setText(device.appPackage);
     ArrayAdapter<String> maxSizeAdapter = new ArrayAdapter<>(context, R.layout.item_spinner_item, maxSizeList);
     ArrayAdapter<String> maxFpsAdapter = new ArrayAdapter<>(context, R.layout.item_spinner_item, maxFpsList);
     ArrayAdapter<String> videoBitAdapter = new ArrayAdapter<>(context, R.layout.item_spinner_item, videoBitList);
@@ -105,6 +110,11 @@ public class PublicTools {
         itemAddDeviceBinding.fallbackAddress.setError(context.getString(R.string.connection_bad_address));
         return;
       }
+      String appPackage = itemAddDeviceBinding.appPackage.getText().toString().trim();
+      if (!Device.isValidAppPackage(appPackage)) {
+        itemAddDeviceBinding.appPackage.setError(context.getString(R.string.device_app_package_invalid));
+        return;
+      }
       Device newDevice = new Device(
         device.id,
         itemAddDeviceBinding.name.getText().toString(),
@@ -116,12 +126,44 @@ public class PublicTools {
         Integer.parseInt(maxVideoBit.itemSpinnerSpinner.getSelectedItem().toString()),
         setResolution.itemSwitchSwitch.isChecked()
       );
+      newDevice.appPackage = appPackage;
       if (newDevice.id != null) AppData.dbHelper.update(newDevice);
       else AppData.dbHelper.insert(newDevice);
       deviceListAdapter.update();
       dialog.hide();
     });
     return dialog;
+  }
+
+  private void scanNetwork(Context context, Dialog dialog, ItemAddDeviceBinding binding) {
+    binding.scanNetwork.setEnabled(false);
+    binding.scanNetwork.setText(R.string.scan_network_progress);
+    Handler mainHandler = new Handler(Looper.getMainLooper());
+    new Thread(() -> {
+      List<String> hosts = LanScanner.findHosts(context.getApplicationContext());
+      mainHandler.post(() -> {
+        binding.scanNetwork.setText(R.string.scan_network);
+        binding.scanNetwork.setEnabled(true);
+        if (!dialog.isShowing()) return;
+        if (context instanceof Activity) {
+          Activity activity = (Activity) context;
+          if (activity.isFinishing() || activity.isDestroyed()) return;
+        }
+        AlertDialog.Builder result = new AlertDialog.Builder(context);
+        if (hosts == null || hosts.isEmpty()) {
+          result.setMessage(hosts == null ? R.string.scan_network_no_wifi : R.string.scan_network_no_devices);
+          result.setPositiveButton(android.R.string.ok, null);
+        } else {
+          result.setTitle(R.string.scan_network_choose_address);
+          result.setItems(hosts.toArray(new String[0]), (choices, index) -> {
+            binding.address.setText(hosts.get(index));
+            binding.address.setError(null);
+          });
+          result.setNegativeButton(android.R.string.cancel, null);
+        }
+        result.show();
+      });
+    }, "adb-network-scan").start();
   }
 
   public ItemTextBinding createTextCard(

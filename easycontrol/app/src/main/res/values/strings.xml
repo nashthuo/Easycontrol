@@ -11,6 +11,7 @@
   <string name="set_about">About</string>
   <string name="set_auto_control_screen">Automatically control the phone screen</string>
   <string name="set_clear_default">Clear default device</string>
+  <string name="allow_automation_commands">Allow automation commands (Tasker)</string>
   <string name="set_other_reset_key">Reset ADB key (requires approval)</string>
   <string name="set_other_ip">IP addresses</string>
   <string name="set_about_help">User guide</string>
@@ -28,6 +29,11 @@
   <string name="device_name_hint">Can NOT be empty</string>
   <string name="device_address_with_port">Address and port</string>
   <string name="device_address_with_port_hint">IPv4, [IPv6], or hostname with port</string>
+  <string name="scan_network">Scan network</string>
+  <string name="scan_network_progress">Scanning network...</string>
+  <string name="scan_network_choose_address">Select an address</string>
+  <string name="scan_network_no_wifi">Connect to a Wi-Fi network with an IPv4 address to scan.</string>
+  <string name="scan_network_no_devices">No devices found. Turn on wireless debugging (adb tcpip 5555) on the phone.</string>
   <string name="device_is_audio">Audio</string>
   <string name="device_advanced">Advanced options</string>
   <string name="device_max_size">Resolution</string>
@@ -42,8 +48,28 @@
   <string name="set_device_default">Set default</string>
   <string name="set_device_button_change">Settings</string>
   <string name="set_device_button_delete">Delete</string>
+  <string name="set_device_send_file">Send file</string>
+
+  <string name="share_activity_label">Send file with Easycontrol EN</string>
+  <string name="file_send_choose_device">Send file to</string>
+  <string name="file_send_no_devices">Add a device in Easycontrol EN first.</string>
+  <string name="file_send_progress">Sending file...</string>
+  <string name="file_send_interrupted">The file transfer was interrupted.</string>
+  <string name="file_picker_unavailable">Could not open the file picker.</string>
+  <string name="file_send_missing_device">The selected device is no longer saved.</string>
+  <string name="file_send_success">Sent %1$s to the phone\'s Download folder</string>
+  <string name="file_send_too_large">This file exceeds the 512 MB limit.</string>
+  <string name="file_send_read_failed">Could not read the selected file.</string>
+  <string name="file_send_upload_failed">Could not save the file to the phone\'s Download folder.</string>
+  <string name="file_send_already_exists">A file with this name is already in the phone\'s Download folder.</string>
 
   <string name="loading_text">Loading\nTap to cancel</string>
   <string name="toast_fullscreen_back">Exit fullscreen to go back on the tablet</string>
   <string name="toast_fullscreen_busy">A device is already open in fullscreen</string>
+  <string name="setting_sync_clipboard">Sync clipboard</string>
+  <string name="setting_video_decoder">Video decoder</string>
+  <string name="setting_video_decoder_auto">Auto (lowest lag)</string>
+  <string name="device_app_package">App to mirror (package name)</string>
+  <string name="device_app_package_hint">Leave empty to mirror the whole screen</string>
+  <string name="device_app_package_invalid">Enter a package name with up to 200 letters, digits, dots, or underscores.</string>
 </resources>

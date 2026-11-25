@@ -34,6 +34,9 @@ public final class Controller {
         case 5:
           handlePower();
           break;
+        case 6:
+          Rotation.toggle();
+          break;
       }
       hasData = Server.streamIn.available() > 0;
     }

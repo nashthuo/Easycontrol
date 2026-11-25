@@ -3,9 +3,18 @@
  */
 package top.saymzx.easycontrol.server.wrappers;
 
+import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY;
+import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION;
+import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC;
+
+import android.content.Context;
+import android.hardware.display.VirtualDisplay;
+import android.util.DisplayMetrics;
 import android.util.Pair;
 import android.view.Display;
+import android.view.Surface;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -13,12 +22,36 @@ import java.util.regex.Pattern;
 
 import top.saymzx.easycontrol.server.entity.DisplayInfo;
 import top.saymzx.easycontrol.server.helper.Command;
+import top.saymzx.easycontrol.server.helper.FakeContext;
 
 public final class DisplayManager {
+  // Hidden display flags available to the shell on Android 10 and 11.
+  private static final int VIRTUAL_DISPLAY_FLAG_SUPPORTS_TOUCH = 1 << 6;
+  private static final int VIRTUAL_DISPLAY_FLAG_DESTROY_CONTENT_ON_REMOVAL = 1 << 8;
   private static Object manager;
 
   public static void init(Object m) {
     manager = m;
+  }
+
+  public static VirtualDisplay createAppDisplay(int width, int height, int density, Surface surface)
+      throws ReflectiveOperationException {
+    Constructor<android.hardware.display.DisplayManager> constructor =
+      android.hardware.display.DisplayManager.class.getDeclaredConstructor(Context.class);
+    constructor.setAccessible(true);
+    android.hardware.display.DisplayManager shellManager = constructor.newInstance(FakeContext.get());
+    int flags = VIRTUAL_DISPLAY_FLAG_PUBLIC | VIRTUAL_DISPLAY_FLAG_PRESENTATION | VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY
+      | VIRTUAL_DISPLAY_FLAG_SUPPORTS_TOUCH | VIRTUAL_DISPLAY_FLAG_DESTROY_CONTENT_ON_REMOVAL;
+    return shellManager.createVirtualDisplay("Easycontrol App", width, height, density, surface, flags);
+  }
+
+  public static int getMainDensity() {
+    try {
+      Object displayInfo = manager.getClass().getMethod("getDisplayInfo", int.class).invoke(manager, Display.DEFAULT_DISPLAY);
+      return displayInfo.getClass().getDeclaredField("logicalDensityDpi").getInt(displayInfo);
+    } catch (ReflectiveOperationException | RuntimeException error) {
+      return DisplayMetrics.DENSITY_DEFAULT;
+    }
   }
 
   public static DisplayInfo parseDisplayInfo(String dumpsysDisplayOutput, int displayId) {

@@ -1,16 +1,23 @@
 package top.saymzx.easycontrol.app.client.view;
 
 import android.annotation.SuppressLint;
+import android.content.ComponentCallbacks;
+import android.content.res.Configuration;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.os.Build;
 import android.util.Pair;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewPropertyAnimator;
 import android.view.WindowManager;
 import android.view.animation.OvershootInterpolator;
+import android.widget.LinearLayout;
+
+import androidx.annotation.NonNull;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -20,15 +27,24 @@ import top.saymzx.easycontrol.app.client.Controller;
 import top.saymzx.easycontrol.app.databinding.ModuleSmallViewBinding;
 import top.saymzx.easycontrol.app.entity.AppData;
 
+// Floating mirror window. The control bar is docked on the side with free space
+// (right in landscape, bottom in portrait) and never hides.
 public class SmallView {
   private final ClientView clientView;
 
   private boolean isShow = false;
   private boolean reconnecting;
+  private boolean landscape;
 
   private final ModuleSmallViewBinding smallView = ModuleSmallViewBinding.inflate(AppData.main.getLayoutInflater());
-  private final int normalMinimumWidth = smallView.getRoot().getMinimumWidth();
-  private final Runnable hideInitialControls = () -> ClientView.resetBar(smallView.barView, false);
+  private final int videoMarginX = AppData.publicTools.dp2px(10f);
+  private final int videoMarginY = AppData.publicTools.dp2px(20f);
+  // Dock buttons: 48 dp touch targets with a 4 dp dead zone between them (Nash 2026-11-25).
+  private final int buttonSize = AppData.publicTools.dp2px(48f);
+  private final int buttonGap = AppData.publicTools.dp2px(4f);
+  private final int dockPadding = AppData.publicTools.dp2px(4f);
+  private final int screenGap = AppData.publicTools.dp2px(8f);
+
   private final WindowManager.LayoutParams smallViewParams =
     new WindowManager.LayoutParams(
       WindowManager.LayoutParams.WRAP_CONTENT,
@@ -44,35 +60,52 @@ public class SmallView {
   private static final int LayoutParamsFlagFocus = baseLayoutParamsFlag | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
   private static final int LayoutParamsFlagNoFocus = baseLayoutParamsFlag | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
 
+  private final Runnable followRotation = () -> {
+    if (!isShow || reconnecting) return;
+    if (isLandscape() == landscape) return;
+    placeWindow();
+    AppData.main.getWindowManager().updateViewLayout(smallView.getRoot(), smallViewParams);
+  };
+
+  // Follows the tablet rotation: move the dock and restore the window box for the new orientation.
+  private final ComponentCallbacks configCallbacks = new ComponentCallbacks() {
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+      // The display size can lag the configuration change, so wait a moment before reading it.
+      smallView.getRoot().removeCallbacks(followRotation);
+      smallView.getRoot().postDelayed(followRotation, 500);
+    }
+
+    @Override
+    public void onLowMemory() {
+    }
+  };
+
   public SmallView(ClientView clientView) {
     this.clientView = clientView;
     smallViewParams.gravity = Gravity.START | Gravity.TOP;
     setFloatVideoListener();
     setReSizeListener();
     setBarListener();
-    smallView.bar.setOnClickListener(v -> {
-      smallView.barView.removeCallbacks(hideInitialControls);
-      ClientView.changeBarViewAnim(smallView.barView, AppData.publicTools.dp2px(-40f));
-    });
     smallView.buttonMini.setOnClickListener(v -> clientView.changeToMini());
     smallView.buttonFull.setOnClickListener(v -> clientView.changeToFull());
+    smallView.buttonFit.setOnClickListener(v -> fitToScreen());
   }
 
   public void show(Controller controller) {
     if (isShow) return;
     smallView.textureViewLayout.addView(clientView.textureView, 0);
     resumeMirroring(controller);
-    resizeForScreen();
-    centerWindow(clientView.textureView.getLayoutParams().width, clientView.textureView.getLayoutParams().height);
+    placeWindow();
     AppData.main.getWindowManager().addView(smallView.getRoot(), smallViewParams);
+    AppData.main.getApplicationContext().registerComponentCallbacks(configCallbacks);
     isShow = true;
     showSmallViewAnim();
   }
 
   public void showReconnecting(Runnable cancel) {
     reconnecting = true;
-    smallView.barView.removeCallbacks(hideInitialControls);
-    ClientView.resetBar(smallView.barView, false);
+    setDockKeysVisible(false);
     smallView.bar.setVisibility(View.INVISIBLE);
     smallView.reSize.setVisibility(View.INVISIBLE);
     smallView.textureViewLayout.setVisibility(View.INVISIBLE);
@@ -82,10 +115,15 @@ public class SmallView {
     if (!isShow) {
       int width = AppData.publicTools.dp2px(232f);
       int height = AppData.publicTools.dp2px(104f);
-      smallView.getRoot().setMinimumWidth(width);
-      smallView.getRoot().setMinimumHeight(height);
-      centerWindow(width, height);
+      smallView.videoColumn.setMinimumWidth(width);
+      smallView.videoColumn.setMinimumHeight(height);
+      applyOrientation();
+      sizeDock(landscape ? height : width);
+      Pair<Integer, Integer> screen = AppData.publicTools.getScreenSize();
+      smallViewParams.x = (screen.first - width) / 2;
+      smallViewParams.y = (screen.second - height) / 2;
       AppData.main.getWindowManager().addView(smallView.getRoot(), smallViewParams);
+      AppData.main.getApplicationContext().registerComponentCallbacks(configCallbacks);
       isShow = true;
     }
   }
@@ -96,22 +134,20 @@ public class SmallView {
     smallView.reconnectStatus.setVisibility(View.GONE);
     smallView.reconnectStatus.setOnClickListener(null);
     smallView.buttonClose.setOnClickListener(v -> clientView.hide(true));
+    smallView.videoColumn.setMinimumWidth(0);
+    smallView.videoColumn.setMinimumHeight(0);
     smallView.textureViewLayout.setVisibility(View.VISIBLE);
     smallView.bar.setVisibility(View.VISIBLE);
     smallView.reSize.setVisibility(View.VISIBLE);
+    setDockKeysVisible(true);
     setButtonListeners(controller);
-    if (wasReconnecting) {
-      clientView.updateTextureViewSize(new Pair<>(clientView.textureView.getLayoutParams().width,
-        clientView.textureView.getLayoutParams().height));
+    if (wasReconnecting && isShow) {
+      placeWindow();
+      AppData.main.getWindowManager().updateViewLayout(smallView.getRoot(), smallViewParams);
     }
-    ClientView.resetBar(smallView.barView, true);
-    smallView.barView.removeCallbacks(hideInitialControls);
-    smallView.barView.postDelayed(hideInitialControls, ClientView.INITIAL_CONTROLS_DURATION_MS);
   }
 
   public void hide() {
-    smallView.barView.removeCallbacks(hideInitialControls);
-    ClientView.resetBar(smallView.barView, false);
     smallView.getRoot().animate().cancel();
     smallView.getRoot().setTranslationY(0);
     smallView.getRoot().setAlpha(1);
@@ -119,21 +155,163 @@ public class SmallView {
     if (!isShow) return;
     isShow = false;
     reconnecting = false;
-    smallView.getRoot().setMinimumWidth(normalMinimumWidth);
-    smallView.getRoot().setMinimumHeight(0);
+    smallView.videoColumn.setMinimumWidth(0);
+    smallView.videoColumn.setMinimumHeight(0);
     smallView.reconnectStatus.setOnClickListener(null);
+    smallView.getRoot().removeCallbacks(followRotation);
+    try {
+      AppData.main.getApplicationContext().unregisterComponentCallbacks(configCallbacks);
+    } catch (RuntimeException ignored) {
+    }
     AppData.main.getWindowManager().removeViewImmediate(smallView.getRoot());
   }
 
+  // The phone turned: keep the window where it is and swap the box sides.
   public void changeRotation() {
-    resizeForScreen();
-    centerWindow(clientView.textureView.getLayoutParams().width, clientView.textureView.getLayoutParams().height);
+    if (!isShow || reconnecting) return;
+    applyOrientation();
+    ViewGroup.LayoutParams lp = clientView.textureView.getLayoutParams();
+    Pair<Integer, Integer> limit = availableBox();
+    clientView.updateTextureViewSize(new Pair<>(Math.min(lp.height, limit.first), Math.min(lp.width, limit.second)));
+    afterVideoResize();
+    clampToScreen();
     AppData.main.getWindowManager().updateViewLayout(smallView.getRoot(), smallViewParams);
   }
 
-  private void resizeForScreen() {
-    Pair<Integer, Integer> screenSize = AppData.publicTools.getScreenSize();
-    clientView.updateTextureViewSize(new Pair<>(screenSize.first * 3 / 4, screenSize.second * 3 / 4));
+  // Restore the saved box for this tablet orientation, or use the default (3/4 of the screen, centred).
+  private void placeWindow() {
+    applyOrientation();
+    int[] box = AppData.setting.getWindowBox(landscape);
+    Pair<Integer, Integer> limit = availableBox();
+    if (box != null) {
+      clientView.updateTextureViewSize(new Pair<>(Math.min(box[2], limit.first), Math.min(box[3], limit.second)));
+      afterVideoResize();
+      smallViewParams.x = box[0];
+      smallViewParams.y = box[1];
+      clampToScreen();
+    } else {
+      Pair<Integer, Integer> screen = AppData.publicTools.getScreenSize();
+      int width = screen.first * 3 / 4 - (landscape ? dockThickness() : 0);
+      int height = screen.second * 3 / 4 - (landscape ? 0 : dockThickness());
+      clientView.updateTextureViewSize(new Pair<>(Math.min(width, limit.first), Math.min(height, limit.second)));
+      afterVideoResize();
+      centerWindow();
+    }
+  }
+
+  // Largest video that fits the screen next to the dock, centred.
+  private void fitToScreen() {
+    if (!isShow || reconnecting) return;
+    applyOrientation();
+    clientView.updateTextureViewSize(availableBox());
+    afterVideoResize();
+    centerWindow();
+    AppData.main.getWindowManager().updateViewLayout(smallView.getRoot(), smallViewParams);
+    saveBox();
+  }
+
+  // The screen area free of the status bar and the navigation bar.
+  private Rect usableArea() {
+    // Read the display, not an activity window: the main activity may be stopped and hold an old frame.
+    android.view.Display display = AppData.main.getWindowManager().getDefaultDisplay();
+    android.util.DisplayMetrics real = new android.util.DisplayMetrics();
+    android.util.DisplayMetrics app = new android.util.DisplayMetrics();
+    display.getRealMetrics(real);
+    display.getMetrics(app);
+    Rect area = new Rect(0, 0, real.widthPixels, real.heightPixels);
+    // The navigation bar takes the difference between the real and the app size.
+    if (app.widthPixels < real.widthPixels) area.right = app.widthPixels;
+    if (app.heightPixels < real.heightPixels) area.bottom = app.heightPixels;
+    int id = AppData.main.getResources().getIdentifier("status_bar_height", "dimen", "android");
+    if (id > 0) area.top = AppData.main.getResources().getDimensionPixelSize(id);
+    return area;
+  }
+
+  private Pair<Integer, Integer> availableBox() {
+    Rect area = usableArea();
+    int dock = dockThickness();
+    int width = area.width() - videoMarginX - screenGap - (landscape ? dock : 0);
+    int height = area.height() - videoMarginY - screenGap - (landscape ? 0 : dock);
+    int min = AppData.publicTools.dp2px(150f);
+    return new Pair<>(Math.max(min, width), Math.max(min, height));
+  }
+
+  private boolean isLandscape() {
+    Pair<Integer, Integer> screen = AppData.publicTools.getScreenSize();
+    return screen.first > screen.second;
+  }
+
+  private void applyOrientation() {
+    landscape = isLandscape();
+    LinearLayout root = smallView.getRoot();
+    root.setOrientation(landscape ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+    smallView.dock.setOrientation(landscape ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
+    LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) smallView.dock.getLayoutParams();
+    lp.gravity = Gravity.CENTER;
+    smallView.dock.setLayoutParams(lp);
+  }
+
+  private void afterVideoResize() {
+    ViewGroup.LayoutParams lp = clientView.textureView.getLayoutParams();
+    sizeDock(landscape ? lp.height + videoMarginY : lp.width + videoMarginX);
+  }
+
+  // Fixed-size dock buttons with a gap along the dock axis. The dock may be longer than the video.
+  private void sizeDock(int length) {
+    int padding = (buttonSize - AppData.publicTools.dp2px(24f)) / 2;
+    for (int i = 0; i < smallView.dock.getChildCount(); i++) {
+      View child = smallView.dock.getChildAt(i);
+      LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) child.getLayoutParams();
+      lp.width = buttonSize;
+      lp.height = buttonSize;
+      int half = buttonGap / 2;
+      if (landscape) lp.setMargins(0, half, 0, half);
+      else lp.setMargins(half, 0, half, 0);
+      child.setLayoutParams(lp);
+      child.setPadding(padding, padding, padding, padding);
+    }
+  }
+
+  private int dockThickness() {
+    return buttonSize + dockPadding;
+  }
+
+  private Pair<Integer, Integer> windowSize() {
+    ViewGroup.LayoutParams lp = clientView.textureView.getLayoutParams();
+    int count = 0;
+    for (int i = 0; i < smallView.dock.getChildCount(); i++)
+      if (smallView.dock.getChildAt(i).getVisibility() != View.GONE) count++;
+    int dockLength = count * (buttonSize + buttonGap) + dockPadding;
+    int videoWidth = lp.width + videoMarginX;
+    int videoHeight = lp.height + videoMarginY;
+    if (landscape) return new Pair<>(videoWidth + dockThickness(), Math.max(videoHeight, dockLength));
+    return new Pair<>(Math.max(videoWidth, dockLength), videoHeight + dockThickness());
+  }
+
+  private void centerWindow() {
+    Rect area = usableArea();
+    Pair<Integer, Integer> size = windowSize();
+    smallViewParams.x = area.left + Math.max(0, (area.width() - size.first) / 2);
+    smallViewParams.y = area.top + Math.max(0, (area.height() - size.second) / 2);
+  }
+
+  private void clampToScreen() {
+    Rect area = usableArea();
+    Pair<Integer, Integer> size = windowSize();
+    smallViewParams.x = Math.max(area.left, Math.min(smallViewParams.x, area.right - size.first));
+    smallViewParams.y = Math.max(area.top, Math.min(smallViewParams.y, area.bottom - size.second));
+  }
+
+  private void saveBox() {
+    ViewGroup.LayoutParams lp = clientView.textureView.getLayoutParams();
+    AppData.setting.setWindowBox(landscape, smallViewParams.x, smallViewParams.y, lp.width, lp.height);
+  }
+
+  private void setDockKeysVisible(boolean visible) {
+    for (int i = 0; i < smallView.dock.getChildCount(); i++) {
+      View child = smallView.dock.getChildAt(i);
+      if (child != smallView.buttonClose) child.setVisibility(visible ? View.VISIBLE : View.GONE);
+    }
   }
 
   private void showSmallViewAnim() {
@@ -200,7 +378,7 @@ public class SmallView {
             if (flipX * flipX + flipY * flipY < 16) return true;
             dragged.set(true);
           }
-          if (x < 200 || x > screenSize.get().first - 200 || y < 200 || y > screenSize.get().second - 200)
+          if (x < 100 || x > screenSize.get().first - 100 || y < 50 || y > screenSize.get().second - 100)
             return true;
           smallViewParams.x = paramsX.get() + flipX;
           smallViewParams.y = paramsY.get() + flipY;
@@ -208,40 +386,41 @@ public class SmallView {
           break;
         }
         case MotionEvent.ACTION_UP:
-          if (!dragged.get()) v.performClick();
+          if (dragged.get()) saveBox();
+          else v.performClick();
           break;
       }
       return true;
     });
   }
 
-  private void centerWindow(int width, int height) {
-    Pair<Integer, Integer> screenSize = AppData.publicTools.getScreenSize();
-    smallViewParams.x = (screenSize.first - Math.max(width, normalMinimumWidth)) / 2;
-    smallViewParams.y = (screenSize.second - height) / 2;
-  }
-
   private void setButtonListeners(Controller controller) {
     smallView.buttonBack.setOnClickListener(v -> controller.sendKeyEvent(KeyEvent.KEYCODE_BACK));
     smallView.buttonHome.setOnClickListener(v -> controller.sendKeyEvent(KeyEvent.KEYCODE_HOME));
     smallView.buttonSwitch.setOnClickListener(v -> controller.sendKeyEvent(KeyEvent.KEYCODE_APP_SWITCH));
-    smallView.buttonDisplay.setOnClickListener(v -> controller.sendPowerEvent());
-    MirrorKeys.bind(smallView.keyControls, controller);
+    smallView.buttonVolumeUp.setOnClickListener(v -> controller.sendKeyEvent(KeyEvent.KEYCODE_VOLUME_UP));
+    smallView.buttonVolumeDown.setOnClickListener(v -> controller.sendKeyEvent(KeyEvent.KEYCODE_VOLUME_DOWN));
+    smallView.buttonPower.setOnClickListener(v -> controller.sendKeyEvent(KeyEvent.KEYCODE_POWER));
+    smallView.buttonWake.setOnClickListener(v -> controller.sendKeyEvent(KeyEvent.KEYCODE_WAKEUP));
+    smallView.buttonRotate.setOnClickListener(v -> controller.sendRotate());
   }
 
   @SuppressLint("ClickableViewAccessibility")
   private void setReSizeListener() {
     int minSize = AppData.publicTools.dp2px(150f);
     smallView.reSize.setOnTouchListener((v, event) -> {
-      if (event.getActionMasked() == MotionEvent.ACTION_MOVE) {
-        int sizeX = (int) (event.getRawX() - smallViewParams.x);
-        int sizeY = (int) (event.getRawY() - smallViewParams.y);
+      int action = event.getActionMasked();
+      if (action == MotionEvent.ACTION_MOVE) {
+        int sizeX = (int) (event.getRawX() - smallViewParams.x) - videoMarginX / 2;
+        int sizeY = (int) (event.getRawY() - smallViewParams.y) - videoMarginY / 2;
         if (sizeX < minSize || sizeY < minSize) return true;
         clientView.updateTextureViewSize(new Pair<>(sizeX, sizeY));
+        afterVideoResize();
+      } else if (action == MotionEvent.ACTION_UP) {
+        saveBox();
       }
       return true;
     });
   }
 
 }
-

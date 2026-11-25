@@ -1,187 +1,191 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Floating mirror window: the video on one side, a docked control bar on the side with free space.
+     SmallView sets the root and dock orientation: dock on the right in landscape, at the bottom in portrait. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
   android:layout_width="wrap_content"
   android:layout_height="wrap_content"
   android:background="@drawable/background_cron"
   android:backgroundTint="@color/cardContainerBackground"
-  android:minWidth="136dp">
+  android:orientation="horizontal">
 
   <FrameLayout
-    android:id="@+id/texture_view_layout"
+    android:id="@+id/video_column"
     android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:layout_marginLeft="5dp"
-    android:layout_marginTop="15dp"
-    android:layout_marginRight="5dp"
-    android:layout_marginBottom="5dp"
-    android:background="#000">
+    android:layout_height="wrap_content">
 
+    <FrameLayout
+      android:id="@+id/texture_view_layout"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginLeft="5dp"
+      android:layout_marginTop="15dp"
+      android:layout_marginRight="5dp"
+      android:layout_marginBottom="5dp"
+      android:background="#000">
 
+      <ImageView
+        android:layout_width="@dimen/round"
+        android:layout_height="@dimen/round"
+        android:layout_gravity="start|top"
+        android:src="@drawable/round"
+        android:tint="@color/cardContainerBackground" />
+
+      <ImageView
+        android:layout_width="@dimen/round"
+        android:layout_height="@dimen/round"
+        android:layout_gravity="end|top"
+        android:rotation="90"
+        android:src="@drawable/round"
+        android:tint="@color/cardContainerBackground" />
+
+      <ImageView
+        android:layout_width="@dimen/round"
+        android:layout_height="@dimen/round"
+        android:layout_gravity="start|bottom"
+        android:rotation="-90"
+        android:src="@drawable/round"
+        android:tint="@color/cardContainerBackground" />
+
+      <ImageView
+        android:layout_width="@dimen/round"
+        android:layout_height="@dimen/round"
+        android:layout_gravity="end|bottom"
+        android:rotation="180"
+        android:src="@drawable/round"
+        android:tint="@color/cardContainerBackground" />
+
+    </FrameLayout>
+
+    <View
+      android:id="@+id/re_size"
+      android:layout_width="30dp"
+      android:layout_height="30dp"
+      android:layout_gravity="end|bottom" />
+
+    <!-- Drag handle: move the window with it. -->
     <ImageView
-      android:layout_width="@dimen/round"
-      android:layout_height="@dimen/round"
-      android:layout_gravity="start|top"
-      android:src="@drawable/round"
-      android:tint="@color/cardContainerBackground" />
+      android:id="@+id/bar"
+      android:layout_width="60dp"
+      android:layout_height="15dp"
+      android:layout_gravity="center_horizontal|top"
+      android:contentDescription="@string/mirror_controls"
+      android:src="@drawable/bar"
+      android:tint="@color/clientBar" />
 
-    <ImageView
-      android:layout_width="@dimen/round"
-      android:layout_height="@dimen/round"
-      android:layout_gravity="end|top"
-      android:rotation="90"
-      android:src="@drawable/round"
-      android:tint="@color/cardContainerBackground" />
+    <LinearLayout
+      android:id="@+id/reconnect_status"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:accessibilityLiveRegion="polite"
+      android:background="@drawable/background_cron"
+      android:backgroundTint="@color/cardContainerBackground"
+      android:contentDescription="@string/mirror_reconnect_action"
+      android:gravity="center"
+      android:orientation="vertical"
+      android:visibility="gone">
 
-    <ImageView
-      android:layout_width="@dimen/round"
-      android:layout_height="@dimen/round"
-      android:layout_gravity="start|bottom"
-      android:rotation="-90"
-      android:src="@drawable/round"
-      android:tint="@color/cardContainerBackground" />
+      <TextView
+        android:id="@+id/reconnect_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/mirror_reconnecting"
+        android:textColor="@color/onCardContainerBackground"
+        android:textSize="16sp" />
 
-    <ImageView
-      android:layout_width="@dimen/round"
-      android:layout_height="@dimen/round"
-      android:layout_gravity="end|bottom"
-      android:rotation="180"
-      android:src="@drawable/round"
-      android:tint="@color/cardContainerBackground" />
-
+      <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/mirror_cancel_reconnect"
+        android:textColor="@color/onCardContainerBackground"
+        android:textSize="13sp" />
+    </LinearLayout>
   </FrameLayout>
 
-  <View
-    android:id="@+id/re_size"
-    android:layout_width="30dp"
-    android:layout_height="30dp"
-    android:layout_gravity="end|bottom" />
-
-  <ImageView
-    android:id="@+id/bar"
-    android:layout_width="60dp"
-    android:layout_height="15dp"
-    android:layout_gravity="center_horizontal|top"
-    android:contentDescription="@string/mirror_controls"
-    android:src="@drawable/bar"
-    android:tint="@color/clientBar" />
-
-  <GridLayout
-    android:id="@+id/bar_view"
-    android:layout_width="176dp"
+  <!-- Docked control bar. It never hides. -->
+  <LinearLayout
+    android:id="@+id/dock"
+    android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:layout_gravity="center_horizontal"
-    android:layout_marginTop="40dp"
+    android:layout_gravity="center"
     android:background="@drawable/background_cron"
     android:backgroundTint="@color/cardBackground"
-    android:columnCount="3"
-    android:padding="8dp"
-    android:visibility="gone">
-
-    <ImageView
-      android:id="@+id/button_mini"
-      android:layout_width="20dp"
-      android:layout_height="20dp"
-      android:layout_columnWeight="1"
-      android:contentDescription="@string/mirror_minimize"
-      android:src="@drawable/mini"
-      android:tint="@color/onCardBackground" />
-
-    <ImageView
-      android:id="@+id/button_full"
-      android:layout_width="20dp"
-      android:layout_height="20dp"
-      android:layout_columnWeight="1"
-      android:contentDescription="@string/mirror_fullscreen"
-      android:src="@drawable/fullscreen"
-      android:tint="@color/onCardBackground" />
-
-    <ImageView
-      android:id="@+id/button_display"
-      android:layout_width="20dp"
-      android:layout_height="20dp"
-      android:layout_columnWeight="1"
-      android:contentDescription="@string/mirror_display"
-      android:src="@drawable/power"
-      android:tint="@color/onCardBackground" />
-
-    <Space
-      android:layout_height="8dp"
-      android:layout_columnSpan="3" />
-
-    <ImageView
-      android:id="@+id/button_switch"
-      android:layout_width="20dp"
-      android:layout_height="20dp"
-      android:layout_columnWeight="1"
-      android:contentDescription="@string/mirror_recent_apps"
-      android:src="@drawable/menu"
-      android:tint="@color/onCardBackground" />
-
-    <ImageView
-      android:id="@+id/button_home"
-      android:layout_width="20dp"
-      android:layout_height="20dp"
-      android:layout_columnWeight="1"
-      android:contentDescription="@string/mirror_home"
-      android:src="@drawable/home"
-      android:tint="@color/onCardBackground" />
-
-    <ImageView
-      android:id="@+id/button_back"
-      android:layout_width="20dp"
-      android:layout_height="20dp"
-      android:layout_columnWeight="1"
-      android:contentDescription="@string/mirror_back"
-      android:src="@drawable/back"
-      android:tint="@color/onCardBackground" />
-
-    <Space
-      android:layout_height="8dp"
-      android:layout_columnSpan="3" />
-
-    <include
-      android:id="@+id/key_controls"
-      layout="@layout/mirror_key_buttons"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:layout_columnSpan="3" />
-
-  </GridLayout>
-
-  <LinearLayout
-    android:id="@+id/reconnect_status"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:accessibilityLiveRegion="polite"
-    android:background="@drawable/background_cron"
-    android:backgroundTint="@color/cardContainerBackground"
-    android:contentDescription="@string/mirror_reconnect_action"
     android:gravity="center"
     android:orientation="vertical"
-    android:visibility="gone">
+    android:padding="2dp">
 
-    <TextView
-      android:id="@+id/reconnect_label"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="@string/mirror_reconnecting"
-      android:textColor="@color/onCardContainerBackground"
-      android:textSize="16sp" />
+    <ImageButton
+      android:id="@+id/button_close"
+      style="@style/MirrorDockButton"
+      android:contentDescription="@string/mirror_close"
+      android:src="@drawable/close"
+      android:tint="@color/buttonSecond" />
 
-    <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:layout_marginTop="4dp"
-      android:text="@string/mirror_cancel_reconnect"
-      android:textColor="@color/onCardContainerBackground"
-      android:textSize="13sp" />
+    <ImageButton
+      android:id="@+id/button_back"
+      style="@style/MirrorDockButton"
+      android:contentDescription="@string/mirror_back"
+      android:src="@drawable/back" />
+
+    <ImageButton
+      android:id="@+id/button_home"
+      style="@style/MirrorDockButton"
+      android:contentDescription="@string/mirror_home"
+      android:src="@drawable/home" />
+
+    <ImageButton
+      android:id="@+id/button_switch"
+      style="@style/MirrorDockButton"
+      android:contentDescription="@string/mirror_recent_apps"
+      android:src="@drawable/menu" />
+
+    <ImageButton
+      android:id="@+id/button_volume_up"
+      style="@style/MirrorDockButton"
+      android:contentDescription="@string/mirror_volume_up"
+      android:src="@drawable/volume_up" />
+
+    <ImageButton
+      android:id="@+id/button_volume_down"
+      style="@style/MirrorDockButton"
+      android:contentDescription="@string/mirror_volume_down"
+      android:src="@drawable/volume_down" />
+
+    <ImageButton
+      android:id="@+id/button_power"
+      style="@style/MirrorDockButton"
+      android:contentDescription="@string/mirror_power"
+      android:src="@drawable/key_power" />
+
+    <ImageButton
+      android:id="@+id/button_wake"
+      style="@style/MirrorDockButton"
+      android:contentDescription="@string/mirror_wake"
+      android:src="@drawable/wake" />
+
+    <ImageButton
+      android:id="@+id/button_rotate"
+      style="@style/MirrorDockButton"
+      android:contentDescription="@string/mirror_rotate"
+      android:src="@drawable/rotate" />
+
+    <ImageButton
+      android:id="@+id/button_fit"
+      style="@style/MirrorDockButton"
+      android:contentDescription="@string/mirror_fit_screen"
+      android:src="@drawable/fit_screen" />
+
+    <ImageButton
+      android:id="@+id/button_full"
+      style="@style/MirrorDockButton"
+      android:contentDescription="@string/mirror_fullscreen"
+      android:src="@drawable/fullscreen" />
+
+    <ImageButton
+      android:id="@+id/button_mini"
+      style="@style/MirrorDockButton"
+      android:contentDescription="@string/mirror_minimize"
+      android:src="@drawable/mini" />
   </LinearLayout>
-
-  <ImageButton
-    android:id="@+id/button_close"
-    style="@style/MirrorCloseButton"
-    android:layout_gravity="top|end"
-    android:layout_marginTop="2dp"
-    android:layout_marginEnd="2dp" />
-</FrameLayout>
+</LinearLayout>

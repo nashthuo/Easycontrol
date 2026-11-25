@@ -7,8 +7,10 @@ import android.widget.ArrayAdapter;
 import android.widget.Toast;
 
 import java.io.File;
+import java.util.List;
 
 import top.saymzx.easycontrol.adb.AdbKeyPair;
+import top.saymzx.easycontrol.app.client.VideoDecode;
 import top.saymzx.easycontrol.app.databinding.ActivitySetBinding;
 import top.saymzx.easycontrol.app.entity.AppData;
 
@@ -37,8 +39,21 @@ public class SetActivity extends EnglishActivity {
     setActivity.setDisplay.addView(AppData.publicTools.createSwitchCard(this, getString(R.string.device_light_off_on_connect), AppData.setting.getSlaveTurnOffScreen(), isChecked -> AppData.setting.setSlaveTurnOffScreen(isChecked)).getRoot());
     setActivity.setDisplay.addView(AppData.publicTools.createSwitchCard(this, getString(R.string.set_auto_control_screen), AppData.setting.getAutoControlScreen(), isChecked -> AppData.setting.setAutoControlScreen(isChecked)).getRoot());
     setActivity.setDisplay.addView(AppData.publicTools.createSwitchCard(this, getString(R.string.device_change_to_full_on_connect), AppData.setting.getDefaultFull(), isChecked -> AppData.setting.setDefaultFull(isChecked)).getRoot());
+    List<String> decoders = VideoDecode.getAvcDecoderNames();
+    String autoDecoder = getString(R.string.setting_video_decoder_auto);
+    String savedDecoder = AppData.setting.getVideoDecoder();
+    String selectedDecoder = decoders.contains(savedDecoder) ? savedDecoder : autoDecoder;
+    decoders.add(0, autoDecoder);
+    ArrayAdapter<String> decoderAdapter = new ArrayAdapter<>(this, R.layout.item_spinner_item, decoders);
+    setActivity.setDisplay.addView(AppData.publicTools.createSpinnerCard(this,
+      getString(R.string.setting_video_decoder), decoderAdapter, selectedDecoder,
+      name -> AppData.setting.setVideoDecoder(autoDecoder.equals(name) ? "" : name)).getRoot());
     setActivity.setOther.addView(AppData.publicTools.createSwitchCard(this, getString(R.string.setting_auto_open_default),
       AppData.setting.getAutoOpenDefault(), AppData.setting::setAutoOpenDefault).getRoot());
+    setActivity.setOther.addView(AppData.publicTools.createSwitchCard(this, getString(R.string.setting_sync_clipboard),
+      AppData.setting.getSyncClipboard(), AppData.setting::setSyncClipboard).getRoot());
+    setActivity.setOther.addView(AppData.publicTools.createSwitchCard(this, getString(R.string.allow_automation_commands),
+      AppData.setting.getAllowCommands(), AppData.setting::setAllowCommands).getRoot());
     setActivity.setOther.addView(AppData.publicTools.createTextCard(this, getString(R.string.set_clear_default), () -> {
       AppData.setting.setDefaultDevice(-1);
       Toast.makeText(this, R.string.toast_default_cleared, Toast.LENGTH_SHORT).show();

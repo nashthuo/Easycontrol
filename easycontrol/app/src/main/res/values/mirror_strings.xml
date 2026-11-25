@@ -18,4 +18,6 @@
   <string name="mirror_reconnecting">Reconnecting…</string>
   <string name="mirror_reconnect_action">Reconnecting. Tap to cancel.</string>
   <string name="mirror_cancel_reconnect">Tap to cancel</string>
+  <string name="mirror_fit_screen">Fit to screen</string>
+  <string name="mirror_rotate">Rotate phone</string>
 </resources>

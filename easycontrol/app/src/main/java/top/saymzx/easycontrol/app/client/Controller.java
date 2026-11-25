@@ -24,6 +24,7 @@ public class Controller {
   }
 
   public void checkClipBoard() {
+    if (!AppData.setting.getSyncClipboard()) return;
     ClipData clipboard = AppData.clipBoard.getPrimaryClip();
     if (clipboard == null || clipboard.getItemCount() == 0) return;
     CharSequence text = clipboard.getItemAt(0).getText();
@@ -40,7 +41,9 @@ public class Controller {
   public void handleClipboardEvent() throws InterruptedException, IOException {
     int size = stream.readInt();
     if (size < 0 || size > 5000) throw new IOException("Invalid clipboard message");
-    clipboardText = new String(stream.readByteArray(size).array(), StandardCharsets.UTF_8);
+    ByteBuffer data = stream.readByteArray(size);
+    if (!AppData.setting.getSyncClipboard()) return;
+    clipboardText = new String(data.array(), StandardCharsets.UTF_8);
     AppData.clipBoard.setPrimaryClip(ClipData.newPlainText(MIMETYPE_TEXT_PLAIN, clipboardText));
   }
 
@@ -65,6 +68,10 @@ public class Controller {
 
   public void sendKeepAlive() {
     writeStream(ByteBuffer.wrap(new byte[]{4}));
+  }
+
+  public void sendRotate() {
+    writeStream(ByteBuffer.wrap(new byte[]{6}));
   }
 
   public void sendPowerEvent() {

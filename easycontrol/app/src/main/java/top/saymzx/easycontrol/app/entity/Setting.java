@@ -1,5 +1,6 @@
 package top.saymzx.easycontrol.app.entity;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 
 public final class Setting {
@@ -91,9 +92,56 @@ public final class Setting {
     sharedPreferences.edit().putBoolean("autoOpenDefault", value).apply();
   }
 
+  public boolean getAllowCommands() {
+    return sharedPreferences.getBoolean("allowCommands", false);
+  }
+
+  public void setAllowCommands(boolean value) {
+    sharedPreferences.edit().putBoolean("allowCommands", value).apply();
+  }
+
   public void setDefaultDevice(int value) {
     editor.putInt("defaultDevice", value);
     editor.apply();
+  }
+
+  // Floating window box per tablet orientation: {x, y, width, height} of the video area, or null.
+  public int[] getWindowBox(boolean landscape) {
+    String value = sharedPreferences.getString(landscape ? "windowBoxLand" : "windowBoxPort", "");
+    String[] parts = value.split(",");
+    if (parts.length != 4) return null;
+    try {
+      int[] box = new int[4];
+      for (int i = 0; i < 4; i++) box[i] = Integer.parseInt(parts[i]);
+      return box[2] > 0 && box[3] > 0 ? box : null;
+    } catch (NumberFormatException ignored) {
+      return null;
+    }
+  }
+
+  public void setWindowBox(boolean landscape, int x, int y, int width, int height) {
+    editor.putString(landscape ? "windowBoxLand" : "windowBoxPort", x + "," + y + "," + width + "," + height);
+    editor.apply();
+  }
+
+  public boolean getSyncClipboard() {
+    return sharedPreferences.getBoolean("syncClipboard", true);
+  }
+
+  public void setSyncClipboard(boolean value) {
+    sharedPreferences.edit().putBoolean("syncClipboard", value).apply();
+  }
+
+  public String getVideoDecoder() {
+    return sharedPreferences.getString("videoDecoder", "");
+  }
+
+  public void setVideoDecoder(String name) {
+    sharedPreferences.edit().putString("videoDecoder", name).apply();
+  }
+
+  public Setting(Context context) {
+    this(context.getSharedPreferences("setting", Context.MODE_PRIVATE));
   }
 
   public Setting(SharedPreferences sharedPreferences) {

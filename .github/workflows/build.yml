@@ -2,7 +2,7 @@ name: Build Easycontrol EN
 
 on:
   push:
-    branches: [english-fork]
+    branches: [english-fork, 'claude/**', 'codex/**']
     tags: ['en-v*']
   workflow_dispatch:
 

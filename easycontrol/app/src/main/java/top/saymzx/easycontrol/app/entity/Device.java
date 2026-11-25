@@ -10,6 +10,7 @@ public class Device {
   public Integer maxFps;
   public Integer maxVideoBit;
   public boolean setResolution;
+  public String appPackage = "";
 
   public Device(Integer id, String name, String address, String fallbackAddress, boolean isAudio,
                 Integer maxSize, Integer maxFps, Integer maxVideoBit, boolean setResolution) {
@@ -28,5 +29,9 @@ public class Device {
     Setting setting = AppData.setting;
     return new Device(null, "", "", "", setting.getDefaultIsAudio(), setting.getDefaultMaxSize(),
       setting.getDefaultMaxFps(), setting.getDefaultVideoBit(), setting.getDefaultSetResolution());
+  }
+
+  public static boolean isValidAppPackage(String name) {
+    return name.isEmpty() || name.matches("[A-Za-z0-9._]{1,200}");
   }
 }

@@ -12,7 +12,7 @@ import top.saymzx.easycontrol.app.entity.Device;
 
 public class DbHelper extends SQLiteOpenHelper {
   private static final String TABLE = "DevicesDb";
-  private static final int VERSION = 2;
+  private static final int VERSION = 3;
 
   public DbHelper(Context context) {
     super(context, "app.db", null, VERSION);
@@ -22,13 +22,16 @@ public class DbHelper extends SQLiteOpenHelper {
   public void onCreate(SQLiteDatabase db) {
     db.execSQL("CREATE TABLE " + TABLE + " (id INTEGER PRIMARY KEY AUTOINCREMENT,"
       + " name TEXT, address TEXT, isAudio INTEGER, maxSize INTEGER, maxFps INTEGER,"
-      + " maxVideoBit INTEGER, setResolution INTEGER, fallbackAddress TEXT NOT NULL DEFAULT '')");
+      + " maxVideoBit INTEGER, setResolution INTEGER, fallbackAddress TEXT NOT NULL DEFAULT '',"
+      + " appPackage TEXT NOT NULL DEFAULT '')");
   }
 
   @Override
   public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
     if (oldVersion < 2)
       db.execSQL("ALTER TABLE " + TABLE + " ADD COLUMN fallbackAddress TEXT NOT NULL DEFAULT ''");
+    if (oldVersion < 3)
+      db.execSQL("ALTER TABLE " + TABLE + " ADD COLUMN appPackage TEXT NOT NULL DEFAULT ''");
   }
 
   public ArrayList<Device> getAll() {
@@ -64,6 +67,7 @@ public class DbHelper extends SQLiteOpenHelper {
     values.put("isAudio", device.isAudio);
     values.put("address", device.address);
     values.put("fallbackAddress", device.fallbackAddress);
+    values.put("appPackage", device.appPackage);
     values.put("maxSize", device.maxSize);
     values.put("maxFps", device.maxFps);
     values.put("maxVideoBit", device.maxVideoBit);
@@ -73,7 +77,7 @@ public class DbHelper extends SQLiteOpenHelper {
 
   private Device getDeviceFromCursor(Cursor cursor) {
     String address = cursor.getString(cursor.getColumnIndexOrThrow("address"));
-    return new Device(
+    Device device = new Device(
       cursor.getInt(cursor.getColumnIndexOrThrow("id")),
       cursor.getString(cursor.getColumnIndexOrThrow("name")),
       address == null ? "" : address,
@@ -83,5 +87,7 @@ public class DbHelper extends SQLiteOpenHelper {
       cursor.getInt(cursor.getColumnIndexOrThrow("maxFps")),
       cursor.getInt(cursor.getColumnIndexOrThrow("maxVideoBit")),
       cursor.getInt(cursor.getColumnIndexOrThrow("setResolution")) == 1);
+    device.appPackage = cursor.getString(cursor.getColumnIndexOrThrow("appPackage"));
+    return device;
   }
 }
