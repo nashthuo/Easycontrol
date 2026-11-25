@@ -74,6 +74,9 @@ A free, always-English, more reliable build of Easycontrol V1.0.11, for one use:
 7. **Key buttons.** Add to the mirror window bar: Volume up, Volume down, Power, Wake. They send the key
    events through the existing control channel.
    - Accept: each button acts on the Redmi (checked by `dumpsys audio` volume and display state).
+   - Nash 2026-11-25: the Close (X) is hidden until a tap on the small blue top line, so he could not find
+     it. Show a small Close button on the window at all times, and show the button bar for 3 s when the
+     window opens, so the controls are easy to find.
 8. **Auto-reconnect.** When the link drops, retry with backoff (2, 4, 8, 16, 30 s, then every 30 s) for
    up to 10 minutes, and show "Reconnecting…" in the window. A tap on the window cancels.
    - Accept: turn the phone Wi-Fi off for 20 s and on; the window comes back without a tap.
