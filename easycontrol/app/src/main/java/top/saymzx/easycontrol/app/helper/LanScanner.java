@@ -27,20 +27,21 @@ final class LanScanner {
   private static final int SCAN_TIMEOUT_MS = 5000;
   private static final int WORKER_COUNT = 32;
 
-  // A null result means the active network has no Wi-Fi IPv4 subnet to scan.
+  // A null result means there is no Wi-Fi IPv4 subnet to scan. The active network can be a VPN
+  // (for example Tailscale), so pick the Wi-Fi network itself.
   static List<String> findHosts(Context context) {
     ConnectivityManager manager = context.getSystemService(ConnectivityManager.class);
     if (manager == null) return null;
-    Network network = manager.getActiveNetwork();
-    if (network == null) return null;
-    NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
-    if (capabilities == null || !capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return null;
-    LinkProperties properties = manager.getLinkProperties(network);
-    if (properties == null) return null;
-
-    for (LinkAddress linkAddress : properties.getLinkAddresses()) {
-      InetAddress address = linkAddress.getAddress();
-      if (address instanceof Inet4Address) return scanSubnet(network, address.getAddress());
+    for (Network network : manager.getAllNetworks()) {
+      NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
+      if (capabilities == null || !capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+        || capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) continue;
+      LinkProperties properties = manager.getLinkProperties(network);
+      if (properties == null) continue;
+      for (LinkAddress linkAddress : properties.getLinkAddresses()) {
+        InetAddress address = linkAddress.getAddress();
+        if (address instanceof Inet4Address) return scanSubnet(network, address.getAddress());
+      }
     }
     return null;
   }
@@ -48,6 +49,8 @@ final class LanScanner {
   private static List<String> scanSubnet(Network network, byte[] address) {
     List<Callable<String>> probes = new ArrayList<>(254);
     for (int host = 1; host <= 254; host++) {
+      // Skip this tablet: its own adb port would show up.
+      if ((address[3] & 0xff) == host) continue;
       byte[] target = {address[0], address[1], address[2], (byte) host};
       probes.add(() -> probeHost(network, target));
     }
