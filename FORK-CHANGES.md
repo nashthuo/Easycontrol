@@ -30,3 +30,10 @@
 - Decoder input buffer sized for large key frames.
 - Known behaviour: after a Power or Wake press, "turn off phone screen" stays paused for the rest of that session.
 - Startup sends the first frame when SPS, PPS and the IDR arrive in one buffer (Qualcomm OMX); the loop reads the NAL types, not only the flags.
+
+## Wave 2
+
+- Prevented device-row long-presses from opening a mirror and ignored repeat opens for the same device within one second.
+- Added opt-in Tasker broadcasts to open or close mirrors and send keys, with Power blocked.
+- Added a Wi-Fi subnet scan for port 5555 in the add and edit device dialog.
+- Added file transfer to the phone's Download folder from the device menu and Android share sheet, with a 512 MB limit.

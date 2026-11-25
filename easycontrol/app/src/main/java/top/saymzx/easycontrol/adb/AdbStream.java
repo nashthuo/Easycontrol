@@ -66,6 +66,12 @@ public class AdbStream implements AutoCloseable {
     sendNext();
   }
 
+  synchronized void writeAndWaitForAck(ByteBuffer data) throws IOException, InterruptedException {
+    write(data);
+    while (!canWrite && !closed) wait();
+    if (closed) throw new IOException("ADB stream closed");
+  }
+
   synchronized void acknowledge(int remoteId) throws IOException, InterruptedException {
     if (closed) return;
     this.remoteId = remoteId;

@@ -1,5 +1,6 @@
 package top.saymzx.easycontrol.app.entity;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 
 public final class Setting {
@@ -91,9 +92,21 @@ public final class Setting {
     sharedPreferences.edit().putBoolean("autoOpenDefault", value).apply();
   }
 
+  public boolean getAllowCommands() {
+    return sharedPreferences.getBoolean("allowCommands", false);
+  }
+
+  public void setAllowCommands(boolean value) {
+    sharedPreferences.edit().putBoolean("allowCommands", value).apply();
+  }
+
   public void setDefaultDevice(int value) {
     editor.putInt("defaultDevice", value);
     editor.apply();
+  }
+
+  public Setting(Context context) {
+    this(context.getSharedPreferences("setting", Context.MODE_PRIVATE));
   }
 
   public Setting(SharedPreferences sharedPreferences) {

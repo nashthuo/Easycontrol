@@ -39,6 +39,8 @@ public class SetActivity extends EnglishActivity {
     setActivity.setDisplay.addView(AppData.publicTools.createSwitchCard(this, getString(R.string.device_change_to_full_on_connect), AppData.setting.getDefaultFull(), isChecked -> AppData.setting.setDefaultFull(isChecked)).getRoot());
     setActivity.setOther.addView(AppData.publicTools.createSwitchCard(this, getString(R.string.setting_auto_open_default),
       AppData.setting.getAutoOpenDefault(), AppData.setting::setAutoOpenDefault).getRoot());
+    setActivity.setOther.addView(AppData.publicTools.createSwitchCard(this, getString(R.string.allow_automation_commands),
+      AppData.setting.getAllowCommands(), AppData.setting::setAllowCommands).getRoot());
     setActivity.setOther.addView(AppData.publicTools.createTextCard(this, getString(R.string.set_clear_default), () -> {
       AppData.setting.setDefaultDevice(-1);
       Toast.makeText(this, R.string.toast_default_cleared, Toast.LENGTH_SHORT).show();

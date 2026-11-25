@@ -19,8 +19,12 @@ import java.net.NoRouteToHostException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -40,6 +44,18 @@ public class Client {
   private static final long RECONNECT_LIMIT_MS = 10 * 60_000L;
   private static final int[] RETRY_DELAYS_MS = {2000, 4000, 8000, 16000, 30000};
   private static final Map<Integer, Client> OPEN_DEVICES = new HashMap<>();
+  private static final Set<Client> OPEN_USB_DEVICES = new HashSet<>();
+
+  // Open clients and their lifecycle state belong to the main thread.
+  public static Client find(int id) {
+    return OPEN_DEVICES.get(id);
+  }
+
+  public static void releaseAll() {
+    List<Client> clients = new ArrayList<>(OPEN_DEVICES.values());
+    clients.addAll(OPEN_USB_DEVICES);
+    for (Client client : clients) client.release();
+  }
 
   private final Handler main = new Handler(Looper.getMainLooper());
   private final Device device;
@@ -72,7 +88,9 @@ public class Client {
     loading.text.setOnClickListener(view -> release());
     dialog = AppData.publicTools.createDialog(AppData.main, false, loading.getRoot());
     dialog.show();
-    if (device.id != null) {
+    if (device.id == null) {
+      OPEN_USB_DEVICES.add(this);
+    } else {
       Client previous = OPEN_DEVICES.put(device.id, this);
       if (previous != null) previous.release();
     }
@@ -444,7 +462,8 @@ public class Client {
   public void release() {
     if (released) return;
     released = true;
-    if (OPEN_DEVICES.get(device.id) == this) OPEN_DEVICES.remove(device.id);
+    if (device.id == null) OPEN_USB_DEVICES.remove(this);
+    else if (OPEN_DEVICES.get(device.id) == this) OPEN_DEVICES.remove(device.id);
     main.removeCallbacks(retry);
     main.removeCallbacks(giveUp);
     dialog.dismiss();
