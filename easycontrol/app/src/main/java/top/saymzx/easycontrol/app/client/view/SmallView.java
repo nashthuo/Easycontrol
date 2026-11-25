@@ -60,16 +60,20 @@ public class SmallView {
   private static final int LayoutParamsFlagFocus = baseLayoutParamsFlag | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
   private static final int LayoutParamsFlagNoFocus = baseLayoutParamsFlag | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
 
+  private final Runnable followRotation = () -> {
+    if (!isShow || reconnecting) return;
+    if (isLandscape() == landscape) return;
+    placeWindow();
+    AppData.main.getWindowManager().updateViewLayout(smallView.getRoot(), smallViewParams);
+  };
+
   // Follows the tablet rotation: move the dock and restore the window box for the new orientation.
   private final ComponentCallbacks configCallbacks = new ComponentCallbacks() {
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
-      smallView.getRoot().post(() -> {
-        if (!isShow || reconnecting) return;
-        if (isLandscape() == landscape) return;
-        placeWindow();
-        AppData.main.getWindowManager().updateViewLayout(smallView.getRoot(), smallViewParams);
-      });
+      // The display size can lag the configuration change, so wait a moment before reading it.
+      smallView.getRoot().removeCallbacks(followRotation);
+      smallView.getRoot().postDelayed(followRotation, 500);
     }
 
     @Override
@@ -154,6 +158,7 @@ public class SmallView {
     smallView.videoColumn.setMinimumWidth(0);
     smallView.videoColumn.setMinimumHeight(0);
     smallView.reconnectStatus.setOnClickListener(null);
+    smallView.getRoot().removeCallbacks(followRotation);
     try {
       AppData.main.getApplicationContext().unregisterComponentCallbacks(configCallbacks);
     } catch (RuntimeException ignored) {
