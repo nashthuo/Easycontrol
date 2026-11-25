@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.ComponentCallbacks;
 import android.content.res.Configuration;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.os.Build;
 import android.util.Pair;
 import android.view.Gravity;
@@ -204,10 +205,20 @@ public class SmallView {
     saveBox();
   }
 
-  private Pair<Integer, Integer> availableBox() {
+  // The screen area free of the status bar and the navigation bar.
+  private Rect usableArea() {
+    Rect area = new Rect();
+    AppData.main.getWindow().getDecorView().getWindowVisibleDisplayFrame(area);
     Pair<Integer, Integer> screen = AppData.publicTools.getScreenSize();
-    int width = screen.first - videoMarginX - screenGap - (landscape ? dockThickness() : 0);
-    int height = screen.second - videoMarginY - screenGap - (landscape ? 0 : dockThickness());
+    if (area.width() <= 0 || area.height() <= 0) area.set(0, 0, screen.first, screen.second);
+    return area;
+  }
+
+  private Pair<Integer, Integer> availableBox() {
+    Rect area = usableArea();
+    int dock = maxButton + dockPadding;
+    int width = area.width() - videoMarginX - screenGap - (landscape ? dock : 0);
+    int height = area.height() - videoMarginY - screenGap - (landscape ? 0 : dock);
     int min = AppData.publicTools.dp2px(150f);
     return new Pair<>(Math.max(min, width), Math.max(min, height));
   }
@@ -267,17 +278,17 @@ public class SmallView {
   }
 
   private void centerWindow() {
-    Pair<Integer, Integer> screen = AppData.publicTools.getScreenSize();
+    Rect area = usableArea();
     Pair<Integer, Integer> size = windowSize();
-    smallViewParams.x = Math.max(0, (screen.first - size.first) / 2);
-    smallViewParams.y = Math.max(0, (screen.second - size.second) / 2);
+    smallViewParams.x = area.left + Math.max(0, (area.width() - size.first) / 2);
+    smallViewParams.y = area.top + Math.max(0, (area.height() - size.second) / 2);
   }
 
   private void clampToScreen() {
-    Pair<Integer, Integer> screen = AppData.publicTools.getScreenSize();
+    Rect area = usableArea();
     Pair<Integer, Integer> size = windowSize();
-    smallViewParams.x = Math.max(0, Math.min(smallViewParams.x, screen.first - size.first));
-    smallViewParams.y = Math.max(0, Math.min(smallViewParams.y, screen.second - size.second));
+    smallViewParams.x = Math.max(area.left, Math.min(smallViewParams.x, area.right - size.first));
+    smallViewParams.y = Math.max(area.top, Math.min(smallViewParams.y, area.bottom - size.second));
   }
 
   private void saveBox() {
